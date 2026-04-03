@@ -85,7 +85,7 @@ class ObjectPool {
 			const obj = this.active.pop();
 			this.resetFn(obj);
 			this.pool.push(obj);
-		}
+		} 
 	}
 	/**
 	 * 获取当前激活对象列表
@@ -293,8 +293,14 @@ class Player extends Entity {
 				}
 				break;
 			default:
-				game.spawnLaser(cx - 20, cy - 25);
-				game.spawnLaser(cx + 20, cy - 25);
+				const nearest = game.findNearestEnemy(cx, cy);
+				if (nearest) {
+					game.spawnLaser(cx - 20, cy - 25, nearest);
+					game.spawnLaser(cx + 20, cy - 25, nearest);
+				} else {
+					game.spawnLaser(cx - 20, cy - 25);
+					game.spawnLaser(cx + 20, cy - 25);
+				}
 				break;
 		}
 	}
@@ -434,6 +440,9 @@ class Laser extends Entity {
 		this.lifeTime = 0;
 		this.maxLifeTime = 200;
 		this.damage = 2;
+		this.endX = 0;
+		this.endY = 0;
+		this.target = null;
 	}
 	reset() {
 		super.reset();
@@ -441,6 +450,9 @@ class Laser extends Entity {
 		this.lifeTime = 0;
 		this.maxLifeTime = 200;
 		this.damage = 2;
+		this.endX = 0;
+		this.endY = 0;
+		this.target = null;
 	}
 	/**
 	 * 更新激光状态（长度、生命周期）
@@ -448,7 +460,14 @@ class Laser extends Entity {
 	 */
 	update(dt) {
 		this.lifeTime += dt * 1000;
-		this.height += 15;
+		if (this.target && this.target.active) {
+			this.endX = this.target.getCenterX();
+			this.endY = this.target.getCenterY();
+		} else if (!this.target) {
+			this.height += 15;
+			this.endX = this.x;
+			this.endY = this.y + this.height;
+		}
 		if (this.lifeTime >= this.maxLifeTime) {
 			this.active = false;
 		}
@@ -461,19 +480,85 @@ class Laser extends Entity {
 		const alpha = 1 - this.lifeTime / this.maxLifeTime;
 		ctx.save();
 		ctx.globalAlpha = alpha;
-		ctx.fillStyle = "#FFFFFF";
-		ctx.fillRect(this.x - 2, this.y, 4, this.height);
-		const gradient = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y);
-		gradient.addColorStop(0, "rgba(0, 255, 157, 0.8)");
-		gradient.addColorStop(0.5, "rgba(0, 255, 157, 0.3)");
-		gradient.addColorStop(1, "rgba(0, 255, 157, 0)");
-		ctx.fillStyle = gradient;
-		ctx.fillRect(this.x - 10, this.y, this.width + 20, this.height);
+		if (this.target) {
+			this.drawLightning(ctx, this.x, this.y, this.endX, this.endY);
+		} else {
+			ctx.fillStyle = "#FFFFFF";
+			ctx.fillRect(this.x - 2, this.y, 4, this.height);
+			const gradient = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
+			gradient.addColorStop(0, "rgba(0, 255, 157, 0.8)");
+			gradient.addColorStop(0.5, "rgba(0, 255, 157, 0.3)");
+			gradient.addColorStop(1, "rgba(0, 255, 157, 0)");
+			ctx.fillStyle = gradient;
+			ctx.fillRect(this.x - 10, this.y, this.width + 20, this.height);
+		}
 		ctx.restore();
+	}
+	/**
+	 * 绘制闪电效果
+	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
+	 * @param {number} startX 起始X
+	 * @param {number} startY 起始Y
+	 * @param {number} endX 结束X
+	 * @param {number} endY 结束Y
+	 */
+	drawLightning(ctx, startX, startY, endX, endY) {
+		const dx = endX - startX;
+		const dy = endY - startY;
+		const dist = Math.sqrt(dx * dx + dy * dy);
+		const steps = Math.max(5, Math.floor(dist / 20));
+		ctx.beginPath();
+		ctx.moveTo(startX, startY);
+		for (let i = 1; i < steps; i++) {
+			const t = i / steps;
+			const px = startX + dx * t;
+			const py = startY + dy * t;
+			const offset = (Math.random() - 0.5) * 15;
+			const perpX = -dy / dist * offset;
+			const perpY = dx / dist * offset;
+			ctx.lineTo(px + perpX, py + perpY);
+		}
+		ctx.lineTo(endX, endY);
+		ctx.strokeStyle = "#FFFFFF";
+		ctx.lineWidth = 3;
+		ctx.stroke();
+		const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
+		gradient.addColorStop(0, "rgba(0, 255, 157, 0.8)");
+		gradient.addColorStop(1, "rgba(0, 255, 157, 0.3)");
+		ctx.strokeStyle = gradient;
+		ctx.lineWidth = 6;
+		ctx.stroke();
 	}
 	checkCollision(enemy) {
 		if (!this.active || !enemy.active) return false;
-		return this.x > enemy.x && this.x < enemy.x + enemy.width && this.y < enemy.y + enemy.height;
+		if (this.target) {
+			// 简单距离检查
+			const dist = this.distanceToLine(enemy.getCenterX(), enemy.getCenterY(), this.x, this.y, this.endX, this.endY);
+			return dist < 15;
+		} else {
+			return this.x > enemy.x && this.x < enemy.x + enemy.width && this.y < enemy.y + enemy.height;
+		}
+	}
+
+	/**
+	 * 计算点到线段的距离
+	 * @param {number} px 点X
+	 * @param {number} py 点Y
+	 * @param {number} x1 线段起点X
+	 * @param {number} y1 线段起点Y
+	 * @param {number} x2 线段终点X
+	 * @param {number} y2 线段终点Y
+	 * @returns {number} 距离
+	 */
+	distanceToLine(px, py, x1, y1, x2, y2) {
+		const dx = x2 - x1;
+		const dy = y2 - y1;
+		const length = Math.sqrt(dx * dx + dy * dy);
+		if (length === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+		const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (length * length)));
+		const closestX = x1 + t * dx;
+		const closestY = y1 + t * dy;
+		return Math.sqrt((px - closestX) ** 2 + (py - closestY) ** 2);
 	}
 }
 
@@ -1344,12 +1429,35 @@ export class Game {
 		bullet.radius = 5;
 	}
 
-	spawnLaser(x, y) {
+	spawnLaser(x, y, target = null) {
 		const laser = this.laserPool.get();
 		laser.reset();
 		laser.active = true;
 		laser.x = x;
 		laser.y = y;
+		laser.target = target;
+		if (!target) {
+			laser.endX = x;
+			laser.endY = y + 100;
+		}
+	}
+
+	findNearestEnemy(playerX, playerY) {
+		const enemies = this.enemyPool.getActive();
+		let nearest = null;
+		let minDist = Infinity;
+		for (const enemy of enemies) {
+			if (enemy.active) {
+				const dx = enemy.getCenterX() - playerX;
+				const dy = enemy.getCenterY() - playerY;
+				const dist = Math.sqrt(dx * dx + dy * dy);
+				if (dist < minDist) {
+					minDist = dist;
+					nearest = enemy;
+				}
+			}
+		}
+		return nearest;
 	}
 
 	spawnEnemy(type, x, y) {
