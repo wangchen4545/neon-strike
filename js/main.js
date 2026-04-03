@@ -1276,7 +1276,7 @@ export class Game {
 		this.resetGame();
 	}
 
-		/**
+	/**
 	 * 重置游戏状态与对象，准备新一局。
 	 */
 	resetGame() {
@@ -1712,4 +1712,3 @@ export class Game {
 		requestAnimationFrame((t) => this.gameLoop(t));
 	}
 }
-
