@@ -1,4 +1,0 @@
-<!-- 霓虹战机 - 游戏页面 -->
-<view class="game-container">
-  <canvas type="2d" id="gameCanvas" class="game-canvas"></canvas>
-</view>
