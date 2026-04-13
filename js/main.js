@@ -22,6 +22,8 @@ const CONFIG = {
 	ITEM_DROP_SPEED: 80,
 	PARTICLE_POOL_SIZE: 200,
 	GRID_CELL_SIZE: 80,
+	INVINCIBLE_SCORE_THRESHOLDS: [3000, 8000, 15000, 25000],
+	INVINCIBLE_DURATION: 5000,
 	COLORS: {
 		PLAYER: "#00F2FF",
 		PLAYER_TRAIL: "#0051FF",
@@ -85,7 +87,7 @@ class ObjectPool {
 			const obj = this.active.pop();
 			this.resetFn(obj);
 			this.pool.push(obj);
-		} 
+		}
 	}
 	/**
 	 * 获取当前激活对象列表
@@ -308,18 +310,19 @@ class Player extends Entity {
 	 * 绘制玩家图形
 	 * @param {CanvasRenderingContext2D} ctx 画布上下文
 	 */
-	draw(ctx) {
-		if (this.invincible && Math.floor(Date.now() / 100) % 2 === 0) {
+	draw(ctx, game) {
+		if (this.invincible && !game.scoreInvincible && Math.floor(Date.now() / 100) % 2 === 0) {
 			return;
 		}
 		const cx = this.getCenterX();
 		const cy = this.getCenterY();
+		const now = Date.now();
 		if (this.shield) {
 			ctx.beginPath();
 			ctx.arc(cx, cy, 30, 0, Math.PI * 2);
 			ctx.strokeStyle = CONFIG.COLORS.ITEM_SHIELD;
 			ctx.lineWidth = 2;
-			ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.3;
+			ctx.globalAlpha = 0.5 + Math.sin(now / 200) * 0.3;
 			ctx.stroke();
 			ctx.globalAlpha = 1;
 		}
@@ -367,7 +370,7 @@ class Player extends Entity {
 	 * @param {Game} game 游戏主对象
 	 */
 	hit(game) {
-		if (this.invincible || this.shield) {
+		if (this.invincible || this.shield || game.scoreInvincible) {
 			if (this.shield) this.shield = false;
 			return;
 		}
@@ -528,8 +531,8 @@ class Laser extends Entity {
 			const px = startX + dx * t;
 			const py = startY + dy * t;
 			const offset = (Math.random() - 0.5) * 15;
-			const perpX = -dy / dist * offset;
-			const perpY = dx / dist * offset;
+			const perpX = (-dy / dist) * offset;
+			const perpY = (dx / dist) * offset;
 			ctx.lineTo(px + perpX, py + perpY);
 		}
 		ctx.lineTo(endX, endY);
@@ -1148,6 +1151,12 @@ export class Game {
 		// 空间网格
 		this.spatialGrid = new SpatialGrid(this.width, this.height, CONFIG.GRID_CELL_SIZE);
 
+		// 分数无敌
+		this.scoreInvincible = false;
+		this.scoreInvincibleTimer = 0;
+		this.nextInvincibleThreshold = CONFIG.INVINCIBLE_SCORE_THRESHOLDS[0];
+		this.invincibleThresholdIndex = 0;
+
 		// 屏幕特效
 		this.screenFlash = 0;
 
@@ -1262,8 +1271,7 @@ export class Game {
 				// 菜单状态：点击开始按钮开始游戏
 				const touch = res.touches[0];
 				const btn = this.startBtn;
-				if (touch.clientX >= btn.x && touch.clientX <= btn.x + btn.width &&
-					touch.clientY >= btn.y && touch.clientY <= btn.y + btn.height) {
+				if (touch.clientX >= btn.x && touch.clientX <= btn.x + btn.width && touch.clientY >= btn.y && touch.clientY <= btn.y + btn.height) {
 					console.log("点击开始按钮，开始游戏");
 					this.startGame();
 				}
@@ -1510,6 +1518,11 @@ export class Game {
 		this.waveCount = 0;
 		this.bossSpawned = false;
 		this.bossWarning = false;
+
+		this.scoreInvincible = false;
+		this.scoreInvincibleTimer = 0;
+		this.invincibleThresholdIndex = 0;
+		this.nextInvincibleThreshold = CONFIG.INVINCIBLE_SCORE_THRESHOLDS[0];
 	}
 
 	gameOver() {
@@ -1526,6 +1539,15 @@ export class Game {
 		this.score += Math.floor(points * multiplier);
 		this.combo++;
 		this.comboTimer = 2000;
+
+		// 检查分数无敌触发
+		if (this.invincibleThresholdIndex < CONFIG.INVINCIBLE_SCORE_THRESHOLDS.length && this.score >= this.nextInvincibleThreshold) {
+			this.scoreInvincible = true;
+			this.scoreInvincibleTimer = CONFIG.INVINCIBLE_DURATION;
+			this.invincibleThresholdIndex++;
+			this.nextInvincibleThreshold = this.invincibleThresholdIndex < CONFIG.INVINCIBLE_SCORE_THRESHOLDS.length ? CONFIG.INVINCIBLE_SCORE_THRESHOLDS[this.invincibleThresholdIndex] : Infinity;
+			this.screenFlash = 0.5;
+		}
 	}
 
 	spawnPlayerBullet(x, y, vx, vy) {
@@ -1777,6 +1799,14 @@ export class Game {
 			}
 		}
 
+		if (this.scoreInvincible) {
+			this.scoreInvincibleTimer -= dt * 1000;
+			if (this.scoreInvincibleTimer <= 0) {
+				this.scoreInvincible = false;
+				this.scoreInvincibleTimer = 0;
+			}
+		}
+
 		this.spawnTimer += dt * 1000;
 		if (this.spawnTimer >= this.spawnInterval && !this.bossWarning) {
 			this.spawnWave();
@@ -1863,6 +1893,15 @@ export class Game {
 		ctx.fillStyle = "#00FF9D";
 		ctx.textAlign = "left";
 		ctx.fillText(`火力 Lv.${this.player.powerLevel}`, 20, this.canvas.height - 20);
+
+		// 无敌状态显示
+		if (this.scoreInvincible) {
+			const timeLeft = Math.ceil(this.scoreInvincibleTimer / 1000);
+			ctx.fillStyle = "#FFD700";
+			ctx.font = "16px Arial";
+			ctx.textAlign = "center";
+			ctx.fillText(`无敌 ${timeLeft}s`, this.canvas.width / 2, 20);
+		}
 	}
 
 	/**
