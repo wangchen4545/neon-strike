@@ -323,30 +323,44 @@ class Player extends Entity {
 			ctx.stroke();
 			ctx.globalAlpha = 1;
 		}
-		ctx.save();
-		ctx.translate(cx, cy);
-		ctx.beginPath();
-		ctx.moveTo(0, -25);
-		ctx.lineTo(-15, 20);
-		ctx.lineTo(-5, 15);
-		ctx.lineTo(0, 22);
-		ctx.lineTo(5, 15);
-		ctx.lineTo(15, 20);
-		ctx.closePath();
-		const gradient = ctx.createLinearGradient(0, -25, 0, 22);
-		gradient.addColorStop(0, CONFIG.COLORS.PLAYER);
-		gradient.addColorStop(1, CONFIG.COLORS.PLAYER_TRAIL);
-		ctx.fillStyle = gradient;
-		ctx.fill();
-		const flameLength = 10 + Math.random() * 8;
-		ctx.beginPath();
-		ctx.moveTo(-6, 20);
-		ctx.lineTo(0, 20 + flameLength);
-		ctx.lineTo(6, 20);
-		ctx.closePath();
-		ctx.fillStyle = "#FF6600";
-		ctx.fill();
-		ctx.restore();
+
+		if (!Player.shipImage) {
+			Player.shipImage = wx.createImage();
+			Player.shipImage.src = "assets/images/zhanji.png";
+		}
+
+		const img = Player.shipImage;
+		if (img.complete && img.naturalWidth !== 0) {
+			const w = 50;
+			const h = 50;
+			ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+		} else {
+			// 备用：如果图片未加载，仍夹带原始向量绘制
+			ctx.save();
+			ctx.translate(cx, cy);
+			ctx.beginPath();
+			ctx.moveTo(0, -25);
+			ctx.lineTo(-15, 20);
+			ctx.lineTo(-5, 15);
+			ctx.lineTo(0, 22);
+			ctx.lineTo(5, 15);
+			ctx.lineTo(15, 20);
+			ctx.closePath();
+			const gradient = ctx.createLinearGradient(0, -25, 0, 22);
+			gradient.addColorStop(0, CONFIG.COLORS.PLAYER);
+			gradient.addColorStop(1, CONFIG.COLORS.PLAYER_TRAIL);
+			ctx.fillStyle = gradient;
+			ctx.fill();
+			const flameLength = 10 + Math.random() * 8;
+			ctx.beginPath();
+			ctx.moveTo(-6, 20);
+			ctx.lineTo(0, 20 + flameLength);
+			ctx.lineTo(6, 20);
+			ctx.closePath();
+			ctx.fillStyle = "#FF6600";
+			ctx.fill();
+			ctx.restore();
+		}
 	}
 	/**
 	 * 处理玩家被击中（扣血与无敌切换）
@@ -817,6 +831,11 @@ class Enemy extends Entity {
 		this.active = false;
 		game.spawnExplosion(this.getCenterX(), this.getCenterY(), this.type === "boss" ? 60 : 30);
 		game.addScore(this.score);
+		if (this.type === "boss") {
+			game.playBossDeathSound();
+		} else {
+			game.playExplodeSound();
+		}
 		if (Math.random() < (this.type === "elite" ? 0.5 : this.type === "boss" ? 1 : 0.1)) {
 			const itemType = this.type === "boss" ? ["power", "bomb", "shield", "score"][Math.floor(Math.random() * 4)] : Math.random() < 0.3 ? "power" : "score";
 			game.spawnItem(this.getCenterX(), this.getCenterY(), itemType);
@@ -1135,9 +1154,18 @@ export class Game {
 		// 输入状态
 		this.touching = false;
 
+		// 开始按钮
+		this.startBtn = {
+			x: this.width / 2 - 80,
+			y: this.height / 2 + 40,
+			width: 160,
+			height: 50,
+		};
+
 		// 初始化
 		this.initPools();
 		this.initInput();
+		this.initAudio();
 
 		// 最后一帧时间
 		this.lastTime = 0;
@@ -1231,9 +1259,14 @@ export class Game {
 					this.handleTouch({ x: touch.clientX, y: touch.clientY });
 				}
 			} else if (this.state === "menu") {
-				// 菜单状态：点击开始游戏
-				console.log("菜单状态，开始游戏");
-				this.startGame();
+				// 菜单状态：点击开始按钮开始游戏
+				const touch = res.touches[0];
+				const btn = this.startBtn;
+				if (touch.clientX >= btn.x && touch.clientX <= btn.x + btn.width &&
+					touch.clientY >= btn.y && touch.clientY <= btn.y + btn.height) {
+					console.log("点击开始按钮，开始游戏");
+					this.startGame();
+				}
 			} else if (this.state === "gameover") {
 				// 游戏结束状态：点击重新开始
 				console.log("游戏结束状态，重新开始");
@@ -1261,6 +1294,78 @@ export class Game {
 			console.log("=== TouchEnd ===");
 			this.touching = false; // 取消触摸状态
 		});
+	}
+
+	/**
+	 * 初始化背景音乐
+	 */
+	initAudio() {
+		this.bgmAudio = wx.createInnerAudioContext();
+		this.bgmAudio.src = "assets/music/back-music.mp3";
+		this.bgmAudio.loop = true;
+		this.bgmAudio.volume = 0.5;
+
+		this.shootAudio = wx.createInnerAudioContext();
+		this.shootAudio.src = "assets/music/biu.mp3";
+		this.shootAudio.volume = 0.3;
+
+		this.thunderAudio = wx.createInnerAudioContext();
+		this.thunderAudio.src = "assets/music/zizi.mp3";
+		this.thunderAudio.volume = 0.4;
+
+		this.explodeAudio = wx.createInnerAudioContext();
+		this.explodeAudio.src = "assets/music/zhai.mp3";
+		this.explodeAudio.volume = 0.5;
+
+		this.bossDeathAudio = wx.createInnerAudioContext();
+		this.bossDeathAudio.src = "assets/music/boss.mp3";
+		this.bossDeathAudio.volume = 0.6;
+	}
+
+	/**
+	 * 播放射击音效
+	 */
+	playShootSound() {
+		if (this.shootAudio) {
+			this.shootAudio.currentTime = 0;
+			this.shootAudio.play();
+		}
+	}
+
+	/**
+	 * 播放雷电音效
+	 */
+	playThunderSound() {
+		if (this.thunderAudio) {
+			this.thunderAudio.currentTime = 0;
+			this.thunderAudio.play();
+		}
+	}
+
+	/**
+	 * 播放爆炸音效
+	 */
+	playExplodeSound() {
+		if (this.explodeAudio) {
+			this.explodeAudio.currentTime = 0;
+			this.explodeAudio.play();
+		}
+	}
+
+	/**
+	 * 播放Boss死亡音效
+	 */
+	playBossDeathSound() {
+		if (this.bossDeathAudio) {
+			this.bossDeathAudio.currentTime = 0;
+			this.bossDeathAudio.play();
+		}
+	}
+	playThunderSound() {
+		if (this.thunderAudio) {
+			this.thunderAudio.currentTime = 0;
+			this.thunderAudio.play();
+		}
 	}
 
 	/**
@@ -1309,16 +1414,33 @@ export class Game {
 		ctx.font = "20px Arial";
 		ctx.fillText("霓虹战机", this.canvas.width / 2, this.canvas.height / 2 - 40);
 
-		// 开始提示
+		// 绘制开始按钮
+		const btn = this.startBtn;
+		const pulse = Math.sin(Date.now() / 300) * 0.1 + 0.9;
+
+		// 按钮背景
+		ctx.fillStyle = `rgba(0, 242, 255, ${pulse * 0.2})`;
+		ctx.fillRect(btn.x, btn.y, btn.width, btn.height);
+
+		// 按钮边框
+		ctx.strokeStyle = `rgba(0, 242, 255, ${pulse})`;
+		ctx.lineWidth = 2;
+		ctx.strokeRect(btn.x, btn.y, btn.width, btn.height);
+
+		// 按钮文字
 		ctx.fillStyle = "#00F2FF";
-		ctx.font = "18px Arial";
-		ctx.fillText("点击开始游戏", this.canvas.width / 2, this.canvas.height / 2 + 20);
+		ctx.font = "bold 20px Arial";
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.fillText("开始游戏", this.width / 2, btn.y + btn.height / 2);
 
 		// 最高分
 		if (this.highScore > 0) {
 			ctx.fillStyle = "#FF9900";
 			ctx.font = "16px Arial";
-			ctx.fillText(`最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 60);
+			ctx.textAlign = "center";
+			ctx.textBaseline = "alphabetic";
+			ctx.fillText(`最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 120);
 		}
 	}
 
@@ -1351,6 +1473,7 @@ export class Game {
 	startGame() {
 		this.state = "playing";
 		this.resetGame();
+		this.bgmAudio.play();
 	}
 
 	/**
@@ -1359,6 +1482,7 @@ export class Game {
 	restartGame() {
 		this.state = "playing";
 		this.resetGame();
+		this.bgmAudio.play();
 	}
 
 	/**
@@ -1390,6 +1514,7 @@ export class Game {
 
 	gameOver() {
 		this.state = "gameover";
+		this.bgmAudio.stop();
 		if (this.score > this.highScore) {
 			this.highScore = this.score;
 			wx.setStorageSync("neonStrikeHighScore", this.highScore.toString());
@@ -1414,6 +1539,7 @@ export class Game {
 		bullet.vy = vy * CONFIG.PLAYER_BULLET_SPEED;
 		bullet.damage = 10;
 		bullet.radius = 4;
+		this.playShootSound();
 	}
 
 	spawnEnemyBullet(x, y, vx, vy) {
@@ -1440,6 +1566,7 @@ export class Game {
 			laser.endX = x;
 			laser.endY = y + 100;
 		}
+		this.playThunderSound();
 	}
 
 	findNearestEnemy(playerX, playerY) {
@@ -1749,6 +1876,7 @@ export class Game {
 		this.starfield.draw(ctx);
 
 		if (this.state === "menu") {
+			this.drawStartScreen();
 			return;
 		}
 
