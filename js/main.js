@@ -1960,7 +1960,7 @@ export class Game {
 			}
 
 			if (this.state === "playing") {
-				this.player.draw(ctx);
+				this.player.draw(ctx, this);
 			}
 
 			// 绘制UI

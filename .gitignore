@@ -13,3 +13,4 @@ npm-debug.log*
 
 # WeChat
 game.gameRes.json
+project.config.json

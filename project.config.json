@@ -2,11 +2,13 @@
 	"description": "Neon Strike 微信小游戏项目配置",
 	"miniprogramRoot": "",
 	"projectname": "neon-strike",
-	"appid": "",
+	"appid": "wxc4aab520a39c3b38",
 	"setting": {
 		"urlCheck": false,
 		"es6": true,
 		"enhance": true,
 		"postcss": true
-	}
+	},
+	"compileType": "game",
+	"simulatorPluginLibVersion": {}
 }
