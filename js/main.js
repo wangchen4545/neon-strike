@@ -1,7 +1,7 @@
 /** @format */
 
 // ============================================
-// NEON STRIKE - 霓虹战机 微信小游戏
+// start STRIKE - 星渊战机 微信小游戏
 // 技术架构: Canvas 2D + 对象池 + 空间网格
 // ============================================
 
@@ -39,6 +39,18 @@ const CONFIG = {
 		ITEM_SCORE: "#FF66FF",
 		GRAZE: "#FFFFFF",
 	},
+	// 副武器配置
+	SECONDARY_ENABLED: true,
+	SECONDARY_COOLDOWN: 2000,
+	SECONDARY_WEAPON_THRESHOLDS: [100000, 500000],
+	MISSILE_SPEED: 400,
+	MISSILE_DAMAGE: 50,
+	SCATTER_BOMB_COUNT: 8,
+	SCATTER_BOMB_SPEED: 250,
+	SCATTER_BOMB_RADIUS: 6,
+	SCATTER_BOMB_RANGE: 80,
+	HOMING_MISSILE_SPEED: 300,
+	HOMING_TURN_RATE: 4,
 };
 
 // ---------------- 对象池 ----------------
@@ -249,6 +261,8 @@ class Player extends Entity {
 		this.invincibleTimer = 0;
 		this.shield = false;
 		this.lastShotTime = 0;
+		this.secondaryWeaponLevel = 1;
+		this.secondaryWeaponCooldown = 0;
 	}
 	/**
 	 * 每帧更新玩家状态
@@ -267,6 +281,14 @@ class Player extends Entity {
 		if (now - this.lastShotTime >= this.fireRate) {
 			this.shoot(game);
 			this.lastShotTime = now;
+		}
+		// 副武器自动发射
+		if (CONFIG.SECONDARY_ENABLED) {
+			this.secondaryWeaponCooldown -= dt * 1000;
+			if (this.secondaryWeaponCooldown <= 0) {
+				this.fireSecondaryWeapon(game);
+				this.secondaryWeaponCooldown = CONFIG.SECONDARY_COOLDOWN;
+			}
 		}
 	}
 	/**
@@ -307,6 +329,29 @@ class Player extends Entity {
 		}
 	}
 	/**
+	 * 根据副武器等级发射副武器
+	 * @param {Game} game 游戏主对象
+	 */
+	fireSecondaryWeapon(game) {
+		const cx = this.getCenterX();
+		const cy = this.getCenterY();
+		switch (this.secondaryWeaponLevel) {
+			case 1: // 普通导弹
+				game.spawnNormalMissile(cx, cy - 20, 0, -1);
+				break;
+			case 2: // 散射高爆弹
+				for (let i = 0; i < CONFIG.SCATTER_BOMB_COUNT; i++) {
+					const angle = (i / CONFIG.SCATTER_BOMB_COUNT) * Math.PI * 2;
+					game.spawnScatterBomb(cx, cy, angle);
+				}
+				break;
+			case 3: // 追踪导弹
+				const nearest = game.findNearestEnemy(cx, cy);
+				game.spawnHomingMissile(cx, cy - 25, nearest);
+				break;
+		}
+	}
+	/**
 	 * 绘制玩家图形
 	 * @param {CanvasRenderingContext2D} ctx 画布上下文
 	 */
@@ -329,7 +374,12 @@ class Player extends Entity {
 
 		if (!Player.shipImage) {
 			Player.shipImage = wx.createImage();
-			Player.shipImage.src = "assets/images/zhanji.png";
+			Player.shipImage.src = "images/zhanji.png";
+		}
+
+		if (!Game.bombImage) {
+			Game.bombImage = wx.createImage();
+			Game.bombImage.src = "images/bomb.png";
 		}
 
 		const img = Player.shipImage;
@@ -415,6 +465,17 @@ class Bullet extends Entity {
 		this.isPlayerBullet = true;
 		this.damage = 10;
 		this.radius = 4;
+		this.isScatterBomb = false;
+		this.isMissile = false;
+		this.isHomingMissile = false;
+		this.bombTimer = 0;
+		this.explodeRange = 0;
+		this.willSplit = false;
+		this.startX = 0;
+		this.startY = 0;
+		this.explodeDistance = 0;
+		this.target = null;
+		this.trail = null;
 	}
 	/**
 	 * 更新子弹位置并检查边界
@@ -424,6 +485,49 @@ class Bullet extends Entity {
 	update(dt, game) {
 		this.x += this.vx * dt;
 		this.y += this.vy * dt;
+
+		// 追踪导弹：实时调整方向
+		if (this.isHomingMissile && this.target && this.target.active) {
+			const dx = this.target.getCenterX() - this.x;
+			const dy = this.target.getCenterY() - this.y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			if (dist > 5) {
+				const targetAngle = Math.atan2(dx, -dy);
+				const currentAngle = Math.atan2(this.vx, -this.vy);
+				let angleDiff = targetAngle - currentAngle;
+				const maxTurn = CONFIG.HOMING_TURN_RATE * dt;
+				angleDiff = Math.max(-maxTurn, Math.min(maxTurn, angleDiff));
+				const newAngle = currentAngle + angleDiff;
+				this.vx = Math.sin(newAngle) * CONFIG.HOMING_MISSILE_SPEED;
+				this.vy = -Math.cos(newAngle) * CONFIG.HOMING_MISSILE_SPEED;
+			}
+			// 记录尾迹
+			if (!this.trail) this.trail = [];
+			this.trail.push({ x: this.x, y: this.y });
+			if (this.trail.length > 10) this.trail.shift();
+		}
+
+		// 散射炸弹：按距离或时间爆炸
+		if (this.isScatterBomb) {
+			if (this.willSplit) {
+				// 主炸弹：飞行到屏幕1/2距离后散开
+				const dx = this.x - this.startX;
+				const dy = this.y - this.startY;
+				const dist = Math.sqrt(dx * dx + dy * dy);
+				if (dist >= this.explodeDistance) {
+					this.explode(game);
+					this.active = false;
+				}
+			} else {
+				// 子炸弹：延时爆炸
+				this.bombTimer -= dt * 1000;
+				if (this.bombTimer <= 0) {
+					this.explode(game);
+					this.active = false;
+				}
+			}
+		}
+
 		if (this.y < -50 || this.y > game.canvas.height + 50 || this.x < -50 || this.x > game.canvas.width + 50) {
 			this.active = false;
 		}
@@ -433,15 +537,125 @@ class Bullet extends Entity {
 	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
 	 */
 	draw(ctx) {
+		if (this.isMissile || this.isHomingMissile) {
+			this.drawMissile(ctx);
+		} else {
+			this.drawBullet(ctx);
+		}
+	}
+
+	/**
+	 * 绘制导弹（带形状和尾烟）
+	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
+	 */
+	drawMissile(ctx) {
+		const angle = Math.atan2(this.vy, this.vx);
+
+		ctx.save();
+		ctx.translate(this.x, this.y);
+		ctx.rotate(angle);
+
+		// 导弹颜色
+		const color = this.isHomingMissile ? "#FF00FF" : "#FF6600";
+
+		// 绘制尾烟拖影（仅追踪导弹）
+		if (this.isHomingMissile && this.trail) {
+			for (let i = 0; i < this.trail.length; i++) {
+				const t = this.trail[i];
+				const alpha = (i / this.trail.length) * 0.5;
+				const size = 3 + (i / this.trail.length) * 3;
+				ctx.save();
+				ctx.rotate(-angle);
+				ctx.translate(t.x - this.x, t.y - this.y);
+				ctx.beginPath();
+				ctx.arc(0, 0, size, 0, Math.PI * 2);
+				ctx.fillStyle = `rgba(255, 100, 255, ${alpha})`;
+				ctx.fill();
+				ctx.restore();
+			}
+		}
+
+		// 导弹主体（向量绘制）
+		ctx.beginPath();
+		// 头部（朝前）
+		ctx.moveTo(15, 0);
+		// 右侧
+		ctx.lineTo(-5, -6);
+		ctx.lineTo(-8, -4);
+		// 尾部
+		ctx.lineTo(-10, -6);
+		ctx.lineTo(-10, 6);
+		// 左侧
+		ctx.lineTo(-8, 4);
+		ctx.lineTo(-5, 6);
+		ctx.closePath();
+		ctx.fillStyle = color;
+		ctx.fill();
+
+		// 引擎火焰
+		const flameLength = 5 + Math.sin(Date.now() / 50) * 3;
+		ctx.beginPath();
+		ctx.moveTo(-10, -3);
+		ctx.lineTo(-10 - flameLength, 0);
+		ctx.lineTo(-10, 3);
+		ctx.closePath();
+		ctx.fillStyle = "#FFFF00";
+		ctx.fill();
+
+		ctx.restore();
+	}
+
+	/**
+	 * 绘制普通子弹
+	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
+	 */
+	drawBullet(ctx) {
+		let color;
+		if (this.isHomingMissile) {
+			color = "#FF00FF"; // 紫色
+		} else if (this.isMissile) {
+			color = "#FF6600"; // 橙色
+		} else if (this.isScatterBomb) {
+			color = "#00FF00"; // 绿色
+			const pulse = Math.sin(Date.now() / 30) * 0.3 + 0.7;
+			ctx.globalAlpha = pulse;
+		} else {
+			color = this.isPlayerBullet ? CONFIG.COLORS.PLAYER_BULLET : CONFIG.COLORS.ENEMY_BULLET;
+		}
+
 		ctx.beginPath();
 		ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-		ctx.fillStyle = this.isPlayerBullet ? CONFIG.COLORS.PLAYER_BULLET : CONFIG.COLORS.ENEMY_BULLET;
+		ctx.fillStyle = color;
 		ctx.fill();
 		ctx.beginPath();
 		ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
 		ctx.globalAlpha = 0.3;
 		ctx.fill();
 		ctx.globalAlpha = 1;
+	}
+	/**
+	 * 散射炸弹爆炸，对范围内敌人造成伤害
+	 * @param {Game} game 游戏主对象
+	 */
+	explode(game) {
+		// 只有 willSplit 的炸弹才会散开成8个
+		if (this.willSplit) {
+			for (let i = 0; i < CONFIG.SCATTER_BOMB_COUNT; i++) {
+				const angle = (i / CONFIG.SCATTER_BOMB_COUNT) * Math.PI * 2;
+				game.spawnSplitBomb(this.x, this.y, angle);
+			}
+		}
+		// 所有散射炸弹都会造成伤害
+		const enemies = game.enemyPool.getActive();
+		for (const enemy of enemies) {
+			if (!enemy.active) continue;
+			const dx = enemy.getCenterX() - this.x;
+			const dy = enemy.getCenterY() - this.y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			if (dist < 30) {
+				enemy.takeDamage(this.damage, game);
+			}
+		}
 	}
 }
 
@@ -1171,6 +1385,16 @@ export class Game {
 			height: 50,
 		};
 
+		// 核弹按钮（右下角）
+		this.nuclearBombBtn = {
+			x: this.width - 70,
+			y: this.height - 70,
+			width: 60,
+			height: 60,
+		};
+		this.hasNuclearBomb = false;
+		this.nuclearBombFlash = 0;
+
 		// 初始化
 		this.initPools();
 		this.initInput();
@@ -1262,6 +1486,17 @@ export class Game {
 					// 在炸弹区域，触发炸弹技能
 					console.log("触发炸弹!");
 					this.player.useBomb(this);
+				} else if (this.score >= 100000) {
+					// 核弹按钮区域检测
+					const nbtn = this.nuclearBombBtn;
+					const dx = touch.clientX - (nbtn.x + nbtn.width / 2);
+					const dy = touch.clientY - (nbtn.y + nbtn.height / 2);
+					if (Math.sqrt(dx * dx + dy * dy) < nbtn.width / 2) {
+						console.log("触发核弹!");
+						this.useNuclearBomb();
+					} else {
+						this.handleTouch({ x: touch.clientX, y: touch.clientY });
+					}
 				} else {
 					// 正常移动区域，更新玩家位置
 					console.log("调用 handleTouch");
@@ -1309,25 +1544,43 @@ export class Game {
 	 */
 	initAudio() {
 		this.bgmAudio = wx.createInnerAudioContext();
-		this.bgmAudio.src = "assets/music/back-music.mp3";
+		this.bgmAudio.src = "audio/back-music.mp3";
 		this.bgmAudio.loop = true;
 		this.bgmAudio.volume = 0.5;
 
 		this.shootAudio = wx.createInnerAudioContext();
-		this.shootAudio.src = "assets/music/biu.mp3";
+		this.shootAudio.src = "audio/biu.mp3";
 		this.shootAudio.volume = 0.3;
 
 		this.thunderAudio = wx.createInnerAudioContext();
-		this.thunderAudio.src = "assets/music/zizi.mp3";
+		this.thunderAudio.src = "audio/zizi.mp3";
 		this.thunderAudio.volume = 0.4;
 
 		this.explodeAudio = wx.createInnerAudioContext();
-		this.explodeAudio.src = "assets/music/zhai.mp3";
+		this.explodeAudio.src = "audio/zhai.mp3";
 		this.explodeAudio.volume = 0.5;
 
 		this.bossDeathAudio = wx.createInnerAudioContext();
-		this.bossDeathAudio.src = "assets/music/boss.mp3";
+		this.bossDeathAudio.src = "audio/boss.mp3";
 		this.bossDeathAudio.volume = 0.6;
+	}
+
+	/**
+	 * 停止并销毁所有音频上下文
+	 */
+	destroyAudio() {
+		const audios = [this.bgmAudio, this.shootAudio, this.thunderAudio, this.explodeAudio, this.bossDeathAudio];
+		for (const audio of audios) {
+			if (audio) {
+				audio.stop();
+				audio.destroy();
+			}
+		}
+		this.bgmAudio = null;
+		this.shootAudio = null;
+		this.thunderAudio = null;
+		this.explodeAudio = null;
+		this.bossDeathAudio = null;
 	}
 
 	/**
@@ -1367,12 +1620,6 @@ export class Game {
 		if (this.bossDeathAudio) {
 			this.bossDeathAudio.currentTime = 0;
 			this.bossDeathAudio.play();
-		}
-	}
-	playThunderSound() {
-		if (this.thunderAudio) {
-			this.thunderAudio.currentTime = 0;
-			this.thunderAudio.play();
 		}
 	}
 
@@ -1420,11 +1667,18 @@ export class Game {
 
 		ctx.fillStyle = "#FF0055";
 		ctx.font = "20px Arial";
-		ctx.fillText("霓虹战机", this.canvas.width / 2, this.canvas.height / 2 - 40);
+		ctx.fillText("星渊战机", this.canvas.width / 2, this.canvas.height / 2 - 40);
 
 		// 绘制开始按钮
 		const btn = this.startBtn;
 		const pulse = Math.sin(Date.now() / 300) * 0.1 + 0.9;
+
+		// 按钮发光效果
+		ctx.save();
+		ctx.shadowColor = "#00F2FF";
+		ctx.shadowBlur = 5;
+		ctx.shadowOffsetX = 0;
+		ctx.shadowOffsetY = 0;
 
 		// 按钮背景
 		ctx.fillStyle = `rgba(0, 242, 255, ${pulse * 0.2})`;
@@ -1434,6 +1688,8 @@ export class Game {
 		ctx.strokeStyle = `rgba(0, 242, 255, ${pulse})`;
 		ctx.lineWidth = 2;
 		ctx.strokeRect(btn.x, btn.y, btn.width, btn.height);
+
+		ctx.restore();
 
 		// 按钮文字
 		ctx.fillStyle = "#00F2FF";
@@ -1523,6 +1779,9 @@ export class Game {
 		this.scoreInvincibleTimer = 0;
 		this.invincibleThresholdIndex = 0;
 		this.nextInvincibleThreshold = CONFIG.INVINCIBLE_SCORE_THRESHOLDS[0];
+
+		this.destroyAudio();
+		this.initAudio();
 	}
 
 	gameOver() {
@@ -1547,6 +1806,15 @@ export class Game {
 			this.invincibleThresholdIndex++;
 			this.nextInvincibleThreshold = this.invincibleThresholdIndex < CONFIG.INVINCIBLE_SCORE_THRESHOLDS.length ? CONFIG.INVINCIBLE_SCORE_THRESHOLDS[this.invincibleThresholdIndex] : Infinity;
 			this.screenFlash = 0.5;
+		}
+
+		// 检查副武器升级
+		if (this.player.secondaryWeaponLevel < 3) {
+			const threshold = CONFIG.SECONDARY_WEAPON_THRESHOLDS[this.player.secondaryWeaponLevel - 1];
+			if (this.score >= threshold) {
+				this.player.secondaryWeaponLevel++;
+				this.screenFlash = 0.3;
+			}
 		}
 	}
 
@@ -1575,6 +1843,70 @@ export class Game {
 		bullet.vy = vy;
 		bullet.damage = 1;
 		bullet.radius = 5;
+	}
+
+	spawnScatterBomb(x, y, angle) {
+		const bullet = this.bulletPool.get();
+		bullet.reset();
+		bullet.active = true;
+		bullet.isPlayerBullet = true;
+		bullet.x = x;
+		bullet.y = y;
+		bullet.startX = x;
+		bullet.startY = y;
+		bullet.vx = Math.sin(angle) * CONFIG.SCATTER_BOMB_SPEED;
+		bullet.vy = Math.cos(angle) * CONFIG.SCATTER_BOMB_SPEED;
+		bullet.damage = 1;
+		bullet.radius = CONFIG.SCATTER_BOMB_RADIUS;
+		bullet.isScatterBomb = true;
+		bullet.willSplit = true;
+		bullet.explodeDistance = this.canvas.height / 2; // 屏幕1/2距离后爆炸
+	}
+
+	spawnSplitBomb(x, y, angle) {
+		const bullet = this.bulletPool.get();
+		bullet.reset();
+		bullet.active = true;
+		bullet.isPlayerBullet = true;
+		bullet.x = x;
+		bullet.y = y;
+		bullet.vx = Math.sin(angle) * CONFIG.SCATTER_BOMB_SPEED;
+		bullet.vy = Math.cos(angle) * CONFIG.SCATTER_BOMB_SPEED;
+		bullet.damage = 1;
+		bullet.radius = CONFIG.SCATTER_BOMB_RADIUS;
+		bullet.isScatterBomb = true;
+		bullet.willSplit = false;
+		bullet.bombTimer = 200; // 子炸弹200ms后爆炸
+	}
+
+	spawnNormalMissile(x, y, vx, vy) {
+		const bullet = this.bulletPool.get();
+		bullet.reset();
+		bullet.active = true;
+		bullet.isPlayerBullet = true;
+		bullet.x = x;
+		bullet.y = y;
+		bullet.vx = vx * CONFIG.MISSILE_SPEED;
+		bullet.vy = vy * CONFIG.MISSILE_SPEED;
+		bullet.damage = CONFIG.MISSILE_DAMAGE;
+		bullet.radius = 5;
+		bullet.isMissile = true;
+	}
+
+	spawnHomingMissile(x, y, target) {
+		const bullet = this.bulletPool.get();
+		bullet.reset();
+		bullet.active = true;
+		bullet.isPlayerBullet = true;
+		bullet.x = x;
+		bullet.y = y;
+		bullet.vx = 0;
+		bullet.vy = -CONFIG.HOMING_MISSILE_SPEED;
+		bullet.damage = CONFIG.MISSILE_DAMAGE;
+		bullet.radius = 5;
+		bullet.isHomingMissile = true;
+		bullet.target = target;
+		bullet.trail = [];
 	}
 
 	spawnLaser(x, y, target = null) {
@@ -1658,6 +1990,35 @@ export class Game {
 				enemy.takeDamage(damage, this);
 			}
 		}
+	}
+
+	/**
+	 * 使用核弹，清除屏幕内一切
+	 */
+	useNuclearBomb() {
+		// 闪光效果
+		this.nuclearBombFlash = 1;
+
+		// 震动效果
+		if (wx.vibrateLong) {
+			wx.vibrateLong({ success: () => {} });
+		}
+
+		// 清除所有敌机子弹
+		this.clearEnemyBullets();
+
+		// 对所有敌机造成大量伤害
+		this.damageAllEnemies(200);
+
+		// 生成巨大爆炸效果
+		for (let i = 0; i < 50; i++) {
+			const x = Math.random() * this.canvas.width;
+			const y = Math.random() * this.canvas.height;
+			this.spawnExplosion(x, y, 30 + Math.random() * 30);
+		}
+
+		// 屏幕特效
+		this.screenFlash = 2;
 	}
 
 	checkCollisions() {
@@ -1894,6 +2255,9 @@ export class Game {
 		ctx.textAlign = "left";
 		ctx.fillText(`火力 Lv.${this.player.powerLevel}`, 20, this.canvas.height - 20);
 
+		ctx.fillStyle = "#FF00FF";
+		ctx.fillText(`副武器 Lv.${this.player.secondaryWeaponLevel}`, 20, this.canvas.height - 50);
+
 		// 无敌状态显示
 		if (this.scoreInvincible) {
 			const timeLeft = Math.ceil(this.scoreInvincibleTimer / 1000);
@@ -1901,6 +2265,42 @@ export class Game {
 			ctx.font = "16px Arial";
 			ctx.textAlign = "center";
 			ctx.fillText(`无敌 ${timeLeft}s`, this.canvas.width / 2, 20);
+		}
+
+		// 核弹按钮（分数达到100000时显示）
+		if (this.score >= 100000) {
+			const btn = this.nuclearBombBtn;
+			const pulse = Math.sin(Date.now() / 200) * 0.2 + 0.8;
+
+			ctx.save();
+
+			// 裁剪为圆形区域
+			ctx.beginPath();
+			ctx.arc(btn.x + btn.width / 2, btn.y + btn.height / 2, btn.width / 2, 0, Math.PI * 2);
+			ctx.clip();
+
+			// 图片平铺按钮背景
+			const bombImg = Game.bombImage;
+			if (bombImg && bombImg.complete && bombImg.naturalWidth !== 0) {
+				const pattern = ctx.createPattern(bombImg, "repeat");
+				ctx.fillStyle = pattern;
+				ctx.fill();
+			} else {
+				// 备用：纯色背景
+				ctx.fillStyle = `rgba(255, 0, 0, ${pulse * 0.3})`;
+				ctx.fill();
+			}
+
+			// 发光边框
+			ctx.shadowColor = "#FF0000";
+			ctx.shadowBlur = 5;
+			ctx.strokeStyle = `rgba(255, 100, 100, ${pulse})`;
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			ctx.arc(btn.x + btn.width / 2, btn.y + btn.height / 2, btn.width / 2, 0, Math.PI * 2);
+			ctx.stroke();
+
+			ctx.restore();
 		}
 	}
 
@@ -1970,6 +2370,14 @@ export class Game {
 				ctx.fillStyle = `rgba(255, 255, 255, ${this.screenFlash * 0.5})`;
 				ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 			}
+
+			// 核弹闪光效果
+			if (this.nuclearBombFlash > 0) {
+				ctx.fillStyle = `rgba(255, 255, 255, ${this.nuclearBombFlash})`;
+				ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+				this.nuclearBombFlash -= dt * 5;
+				if (this.nuclearBombFlash < 0) this.nuclearBombFlash = 0;
+			}
 		}
 	}
 
@@ -1982,7 +2390,7 @@ export class Game {
 		this.lastTime = timestamp;
 
 		this.update(dt);
-		this.draw();
+		this.draw(dt);
 
 		requestAnimationFrame((t) => this.gameLoop(t));
 	}
