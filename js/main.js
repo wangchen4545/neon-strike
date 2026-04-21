@@ -1416,6 +1416,21 @@ export class Game {
 			info.image.src = info.src;
 		}
 
+		// 加载自定义字体
+		Game.loadedFont = null;
+		wx.loadFont({
+			source: "data:text/css;base64," + wx.arrayBufferToBase64(wx.fileSystemManager.readFileSync("images/star_depth_font.ttf")),
+			family: "StarDepthFont",
+			success: (res) => {
+				Game.loadedFont = "StarDepthFont";
+				console.log("字体加载成功");
+			},
+			fail: (err) => {
+				console.log("字体加载失败，使用默认字体", err);
+				Game.loadedFont = "Arial";
+			}
+		});
+
 		// 初始化
 		this.initPools();
 		this.initInput();
@@ -1681,16 +1696,9 @@ export class Game {
 		this.starfield.draw(ctx);
 
 		// 标题
-		ctx.fillStyle = "#00F2FF";
-		ctx.font = "bold 36px Arial";
-		ctx.textAlign = "center";
-		ctx.fillText("NEON STRIKE", this.canvas.width / 2, this.canvas.height / 2 - 80);
+		this.drawText(ctx, "NEON STRIKE", this.canvas.width / 2, this.canvas.height / 2 - 80, "#00F2FF", "bold 36px");
 
-		ctx.fillStyle = "#FF0055";
-		ctx.font = "20px Arial";
-		if (!this.drawTextImage(ctx, "星空战机", this.canvas.width / 2, this.canvas.height / 2 - 40)) {
-			ctx.fillText("星渊战机", this.canvas.width / 2, this.canvas.height / 2 - 40);
-		}
+		this.drawText(ctx, "星渊战机", this.canvas.width / 2, this.canvas.height / 2 - 40, "#FF0055", "20px");
 
 		// 绘制开始按钮
 		const btn = this.startBtn;
@@ -1715,27 +1723,11 @@ export class Game {
 		ctx.restore();
 
 		// 按钮文字
-		ctx.fillStyle = "#00F2FF";
-		ctx.font = "bold 20px Arial";
-		ctx.textAlign = "center";
-		ctx.textBaseline = "middle";
-		if (!this.drawTextImage(ctx, "开始游戏", this.width / 2, btn.y + btn.height / 2)) {
-			ctx.fillText("开始游戏", this.width / 2, btn.y + btn.height / 2);
-		}
+		this.drawText(ctx, "开始游戏", this.width / 2, btn.y + btn.height / 2, "#00F2FF", "bold 20px");
 
 		// 最高分
 		if (this.highScore > 0) {
-			ctx.fillStyle = "#FF9900";
-			ctx.font = "16px Arial";
-			ctx.textAlign = "center";
-			ctx.textBaseline = "alphabetic";
-			if (!this.drawTextImage(ctx, "最高分", this.canvas.width / 2 - 20, this.canvas.height / 2 + 120)) {
-				ctx.fillText(`最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 120);
-			} else {
-				ctx.fillStyle = "#FF9900";
-				ctx.font = "16px Arial";
-				ctx.fillText(`${this.highScore}`, this.canvas.width / 2 + 30, this.canvas.height / 2 + 120);
-			}
+			this.drawText(ctx, `最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 120, "#FF9900", "16px");
 		}
 	}
 
@@ -1744,38 +1736,13 @@ export class Game {
 		ctx.fillStyle = "rgba(5, 5, 16, 0.9)";
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-		ctx.fillStyle = "#FF0055";
-		ctx.font = "bold 36px Arial";
-		ctx.textAlign = "center";
-		if (!this.drawTextImage(ctx, "GAME OVER", this.canvas.width / 2, this.canvas.height / 2 - 60)) {
-			ctx.fillText("GAME OVER", this.canvas.width / 2, this.canvas.height / 2 - 60);
-		}
+		this.drawText(ctx, "GAME OVER", this.canvas.width / 2, this.canvas.height / 2 - 60, "#FF0055", "bold 36px");
 
-		ctx.fillStyle = "#00F2FF";
-		ctx.font = "24px Arial";
-		if (!this.drawTextImage(ctx, "得分", this.canvas.width / 2 - 20, this.canvas.height / 2)) {
-			ctx.fillText(`得分: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2);
-		} else {
-			ctx.fillStyle = "#00F2FF";
-			ctx.font = "24px Arial";
-			ctx.fillText(`${this.score}`, this.canvas.width / 2 + 30, this.canvas.height / 2);
-		}
+		this.drawText(ctx, `得分: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2, "#00F2FF", "24px");
 
-		ctx.fillStyle = "#FF9900";
-		ctx.font = "18px Arial";
-		if (!this.drawTextImage(ctx, "最高分", this.canvas.width / 2 - 20, this.canvas.height / 2 + 40)) {
-			ctx.fillText(`最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 40);
-		} else {
-			ctx.fillStyle = "#FF9900";
-			ctx.font = "18px Arial";
-			ctx.fillText(`${this.highScore}`, this.canvas.width / 2 + 30, this.canvas.height / 2 + 40);
-		}
+		this.drawText(ctx, `最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 40, "#FF9900", "18px");
 
-		ctx.fillStyle = "#00F2FF";
-		ctx.font = "16px Arial";
-		if (!this.drawTextImage(ctx, "点击重新开始", this.canvas.width / 2, this.canvas.height / 2 + 90)) {
-			ctx.fillText("点击重新开始", this.canvas.width / 2, this.canvas.height / 2 + 90);
-		}
+		this.drawText(ctx, "点击重新开始", this.canvas.width / 2, this.canvas.height / 2 + 90, "#00F2FF", "16px");
 	}
 
 	/**
@@ -2040,19 +2007,21 @@ export class Game {
 	}
 
 	/**
-	 * 绘制图片文字
+	 * 绘制字体文字
 	 * @param {CanvasRenderingContext2D} ctx
-	 * @param {string} textKey 图片字典的key
+	 * @param {string} text 要绘制的文字
 	 * @param {number} x 中心x坐标
 	 * @param {number} y 中心y坐标
+	 * @param {string} color 文字颜色
+	 * @param {string} fontSize 字体大小，如 "20px"
 	 */
-	drawTextImage(ctx, textKey, x, y) {
-		const info = Game.textImages[textKey];
-		if (!info || !info.image || !info.image.complete || info.image.naturalWidth === 0) {
-			return false;
-		}
-		ctx.drawImage(info.image, x - info.width / 2, y - info.height / 2, info.width, info.height);
-		return true;
+	drawText(ctx, text, x, y, color = "#00F2FF", fontSize = "20px") {
+		const fontFamily = Game.loadedFont || "Arial";
+		ctx.font = `${fontSize} ${fontFamily}`;
+		ctx.fillStyle = color;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.fillText(text, x, y);
 	}
 
 	/**
@@ -2295,63 +2264,35 @@ export class Game {
 	 * @param {CanvasRenderingContext2D} ctx 绘图上下文
 	 */
 	drawUI(ctx) {
-		ctx.fillStyle = "#00F2FF";
-		ctx.font = "20px Arial";
-		ctx.textAlign = "left";
-		if (!this.drawTextImage(ctx, "得分16", 36, 30)) {
-			ctx.fillText(`得分: ${this.score}`, 20, 30);
-		} else {
-			ctx.fillStyle = "#00F2FF";
-			ctx.font = "20px Arial";
-			ctx.fillText(`${this.score}`, 56, 30);
-		}
+		// 得分
+		this.drawText(ctx, `得分: ${this.score}`, 50, 30, "#00F2FF", "16px");
 
+		// 连击
 		if (this.combo > 1) {
-			ctx.fillStyle = "#FF9900";
-			if (!this.drawTextImage(ctx, "连击", 24, 55)) {
-				ctx.fillText(`连击 x${this.combo}`, 20, 55);
-			} else {
-				ctx.fillStyle = "#FF9900";
-				ctx.font = "16px Arial";
-				ctx.fillText(`x${this.combo}`, 44, 55);
-			}
+			this.drawText(ctx, `连击 x${this.combo}`, 40, 55, "#FF9900", "16px");
 		}
 
+		// 生命值
 		ctx.fillStyle = "#FF0055";
 		ctx.textAlign = "right";
+		ctx.font = "16px Arial";
 		let lives = "";
 		for (let i = 0; i < Math.max(0, this.player.hp); i++) lives += "❤";
 		ctx.fillText(lives, this.canvas.width - 20, 30);
 
-		ctx.fillStyle = "#FFFF00";
-		ctx.fillText(`炸弹 x${this.player.bombs}`, this.canvas.width - 20, this.canvas.height - 20);
+		// 炸弹
+		this.drawText(ctx, `炸弹 x${this.player.bombs}`, this.canvas.width - 20, this.canvas.height - 20, "#FFFF00", "16px");
 
-		ctx.fillStyle = "#00FF9D";
-		ctx.textAlign = "left";
-		if (!this.drawTextImage(ctx, "火力", 24, this.canvas.height - 20)) {
-			ctx.fillText(`火力 Lv.${this.player.powerLevel}`, 20, this.canvas.height - 20);
-		} else {
-			ctx.fillStyle = "#00FF9D";
-			ctx.font = "16px Arial";
-			ctx.fillText(`Lv.${this.player.powerLevel}`, 44, this.canvas.height - 20);
-		}
+		// 火力
+		this.drawText(ctx, `火力 Lv.${this.player.powerLevel}`, 60, this.canvas.height - 20, "#00FF9D", "16px");
 
-		ctx.fillStyle = "#FF00FF";
-		if (!this.drawTextImage(ctx, "副武器", 32, this.canvas.height - 50)) {
-			ctx.fillText(`副武器 Lv.${this.player.secondaryWeaponLevel}`, 20, this.canvas.height - 50);
-		} else {
-			ctx.fillStyle = "#FF00FF";
-			ctx.font = "16px Arial";
-			ctx.fillText(`Lv.${this.player.secondaryWeaponLevel}`, 68, this.canvas.height - 50);
-		}
+		// 副武器
+		this.drawText(ctx, `副武器 Lv.${this.player.secondaryWeaponLevel}`, 85, this.canvas.height - 50, "#FF00FF", "16px");
 
 		// 无敌状态显示
 		if (this.scoreInvincible) {
 			const timeLeft = Math.ceil(this.scoreInvincibleTimer / 1000);
-			ctx.fillStyle = "#FFD700";
-			ctx.font = "16px Arial";
-			ctx.textAlign = "center";
-			ctx.fillText(`无敌 ${timeLeft}s`, this.canvas.width / 2, 20);
+			this.drawText(ctx, `无敌 ${timeLeft}s`, this.canvas.width / 2, 20, "#FFD700", "16px");
 		}
 
 		// 核弹按钮（分数达到100000时显示）
