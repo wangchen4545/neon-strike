@@ -1417,19 +1417,16 @@ export class Game {
 		}
 
 		// 加载自定义字体
-		Game.loadedFont = null;
-		wx.loadFont({
-			source: "data:text/css;base64," + wx.arrayBufferToBase64(wx.fileSystemManager.readFileSync("images/star_depth_font.ttf")),
-			family: "StarDepthFont",
-			success: (res) => {
-				Game.loadedFont = "StarDepthFont";
-				console.log("字体加载成功");
-			},
-			fail: (err) => {
-				console.log("字体加载失败，使用默认字体", err);
-				Game.loadedFont = "Arial";
+		Game.loadedFont = "Arial"; // 默认字体
+		try {
+			const fontFamily = wx.loadFont("images/star_depth_font.ttf");
+			if (fontFamily) {
+				Game.loadedFont = fontFamily;
+				console.log("字体加载成功", fontFamily);
 			}
-		});
+		} catch (err) {
+			console.log("字体加载失败，使用默认字体", err);
+		}
 
 		// 初始化
 		this.initPools();
