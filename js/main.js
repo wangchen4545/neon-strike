@@ -379,7 +379,7 @@ class Player extends Entity {
 
 		if (!Game.bombImage) {
 			Game.bombImage = wx.createImage();
-			Game.bombImage.src = "images/bomb.png";
+			Game.bombImage.src = "images/bomb_btn.png";
 		}
 
 		const img = Player.shipImage;
@@ -1395,6 +1395,27 @@ export class Game {
 		this.hasNuclearBomb = false;
 		this.nuclearBombFlash = 0;
 
+		// 图片文字字典
+		Game.textImages = {
+			"星空战机": { src: "images/icon_title_36px.png", width: 120, height: 36 },
+			"开始游戏": { src: "images/icon_start_26px.png", width: 80, height: 26 },
+			"最高分": { src: "images/icon_highscore_16px.png", width: 48, height: 16 },
+			"GAME OVER": { src: "images/icon_GAME_OVER_36px.png", width: 160, height: 36 },
+			"得分": { src: "images/icon_score_36px.png", width: 48, height: 36 },
+			"得分16": { src: "images/icon_score_16px.png", width: 32, height: 16 },
+			"点击重新开始": { src: "images/icon_restart_18px.png", width: 120, height: 18 },
+			"连击": { src: "images/icon_combo_16px.png", width: 48, height: 16 },
+			"火力": { src: "images/icon_power_16px.png", width: 48, height: 16 },
+			"副武器": { src: "images/icon_secondary_16px.png", width: 64, height: 16 },
+		};
+
+		// 加载图片文字
+		for (const key in Game.textImages) {
+			const info = Game.textImages[key];
+			info.image = wx.createImage();
+			info.image.src = info.src;
+		}
+
 		// 初始化
 		this.initPools();
 		this.initInput();
@@ -1667,7 +1688,9 @@ export class Game {
 
 		ctx.fillStyle = "#FF0055";
 		ctx.font = "20px Arial";
-		ctx.fillText("星渊战机", this.canvas.width / 2, this.canvas.height / 2 - 40);
+		if (!this.drawTextImage(ctx, "星空战机", this.canvas.width / 2, this.canvas.height / 2 - 40)) {
+			ctx.fillText("星渊战机", this.canvas.width / 2, this.canvas.height / 2 - 40);
+		}
 
 		// 绘制开始按钮
 		const btn = this.startBtn;
@@ -1696,7 +1719,9 @@ export class Game {
 		ctx.font = "bold 20px Arial";
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		ctx.fillText("开始游戏", this.width / 2, btn.y + btn.height / 2);
+		if (!this.drawTextImage(ctx, "开始游戏", this.width / 2, btn.y + btn.height / 2)) {
+			ctx.fillText("开始游戏", this.width / 2, btn.y + btn.height / 2);
+		}
 
 		// 最高分
 		if (this.highScore > 0) {
@@ -1704,7 +1729,13 @@ export class Game {
 			ctx.font = "16px Arial";
 			ctx.textAlign = "center";
 			ctx.textBaseline = "alphabetic";
-			ctx.fillText(`最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 120);
+			if (!this.drawTextImage(ctx, "最高分", this.canvas.width / 2 - 20, this.canvas.height / 2 + 120)) {
+				ctx.fillText(`最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 120);
+			} else {
+				ctx.fillStyle = "#FF9900";
+				ctx.font = "16px Arial";
+				ctx.fillText(`${this.highScore}`, this.canvas.width / 2 + 30, this.canvas.height / 2 + 120);
+			}
 		}
 	}
 
@@ -1716,19 +1747,35 @@ export class Game {
 		ctx.fillStyle = "#FF0055";
 		ctx.font = "bold 36px Arial";
 		ctx.textAlign = "center";
-		ctx.fillText("GAME OVER", this.canvas.width / 2, this.canvas.height / 2 - 60);
+		if (!this.drawTextImage(ctx, "GAME OVER", this.canvas.width / 2, this.canvas.height / 2 - 60)) {
+			ctx.fillText("GAME OVER", this.canvas.width / 2, this.canvas.height / 2 - 60);
+		}
 
 		ctx.fillStyle = "#00F2FF";
 		ctx.font = "24px Arial";
-		ctx.fillText(`得分: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2);
+		if (!this.drawTextImage(ctx, "得分", this.canvas.width / 2 - 20, this.canvas.height / 2)) {
+			ctx.fillText(`得分: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2);
+		} else {
+			ctx.fillStyle = "#00F2FF";
+			ctx.font = "24px Arial";
+			ctx.fillText(`${this.score}`, this.canvas.width / 2 + 30, this.canvas.height / 2);
+		}
 
 		ctx.fillStyle = "#FF9900";
 		ctx.font = "18px Arial";
-		ctx.fillText(`最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 40);
+		if (!this.drawTextImage(ctx, "最高分", this.canvas.width / 2 - 20, this.canvas.height / 2 + 40)) {
+			ctx.fillText(`最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 40);
+		} else {
+			ctx.fillStyle = "#FF9900";
+			ctx.font = "18px Arial";
+			ctx.fillText(`${this.highScore}`, this.canvas.width / 2 + 30, this.canvas.height / 2 + 40);
+		}
 
 		ctx.fillStyle = "#00F2FF";
 		ctx.font = "16px Arial";
-		ctx.fillText("点击重新开始", this.canvas.width / 2, this.canvas.height / 2 + 90);
+		if (!this.drawTextImage(ctx, "点击重新开始", this.canvas.width / 2, this.canvas.height / 2 + 90)) {
+			ctx.fillText("点击重新开始", this.canvas.width / 2, this.canvas.height / 2 + 90);
+		}
 	}
 
 	/**
@@ -1993,6 +2040,22 @@ export class Game {
 	}
 
 	/**
+	 * 绘制图片文字
+	 * @param {CanvasRenderingContext2D} ctx
+	 * @param {string} textKey 图片字典的key
+	 * @param {number} x 中心x坐标
+	 * @param {number} y 中心y坐标
+	 */
+	drawTextImage(ctx, textKey, x, y) {
+		const info = Game.textImages[textKey];
+		if (!info || !info.image || !info.image.complete || info.image.naturalWidth === 0) {
+			return false;
+		}
+		ctx.drawImage(info.image, x - info.width / 2, y - info.height / 2, info.width, info.height);
+		return true;
+	}
+
+	/**
 	 * 使用核弹，清除屏幕内一切
 	 */
 	useNuclearBomb() {
@@ -2235,11 +2298,23 @@ export class Game {
 		ctx.fillStyle = "#00F2FF";
 		ctx.font = "20px Arial";
 		ctx.textAlign = "left";
-		ctx.fillText(`得分: ${this.score}`, 20, 30);
+		if (!this.drawTextImage(ctx, "得分16", 36, 30)) {
+			ctx.fillText(`得分: ${this.score}`, 20, 30);
+		} else {
+			ctx.fillStyle = "#00F2FF";
+			ctx.font = "20px Arial";
+			ctx.fillText(`${this.score}`, 56, 30);
+		}
 
 		if (this.combo > 1) {
 			ctx.fillStyle = "#FF9900";
-			ctx.fillText(`连击 x${this.combo}`, 20, 55);
+			if (!this.drawTextImage(ctx, "连击", 24, 55)) {
+				ctx.fillText(`连击 x${this.combo}`, 20, 55);
+			} else {
+				ctx.fillStyle = "#FF9900";
+				ctx.font = "16px Arial";
+				ctx.fillText(`x${this.combo}`, 44, 55);
+			}
 		}
 
 		ctx.fillStyle = "#FF0055";
@@ -2253,10 +2328,22 @@ export class Game {
 
 		ctx.fillStyle = "#00FF9D";
 		ctx.textAlign = "left";
-		ctx.fillText(`火力 Lv.${this.player.powerLevel}`, 20, this.canvas.height - 20);
+		if (!this.drawTextImage(ctx, "火力", 24, this.canvas.height - 20)) {
+			ctx.fillText(`火力 Lv.${this.player.powerLevel}`, 20, this.canvas.height - 20);
+		} else {
+			ctx.fillStyle = "#00FF9D";
+			ctx.font = "16px Arial";
+			ctx.fillText(`Lv.${this.player.powerLevel}`, 44, this.canvas.height - 20);
+		}
 
 		ctx.fillStyle = "#FF00FF";
-		ctx.fillText(`副武器 Lv.${this.player.secondaryWeaponLevel}`, 20, this.canvas.height - 50);
+		if (!this.drawTextImage(ctx, "副武器", 32, this.canvas.height - 50)) {
+			ctx.fillText(`副武器 Lv.${this.player.secondaryWeaponLevel}`, 20, this.canvas.height - 50);
+		} else {
+			ctx.fillStyle = "#FF00FF";
+			ctx.font = "16px Arial";
+			ctx.fillText(`Lv.${this.player.secondaryWeaponLevel}`, 68, this.canvas.height - 50);
+		}
 
 		// 无敌状态显示
 		if (this.scoreInvincible) {

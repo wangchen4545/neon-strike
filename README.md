@@ -10,8 +10,8 @@ neon-strike/
 ├── game.json                # 游戏配置
 ├── app.json                 # 应用配置
 ├── project.config.json      # 微信项目配置
-├── images/                  # 图片资源（当前为空）
-├── audio/                   # 音频资源（当前为空）
+├── images/                  # 图片资源
+├── audio/                   # 音频资源
 └── js/
     ├── main.js              # 全部游戏逻辑（~1800行）
     ├── render.js            # 渲染模块（桩文件）
@@ -173,6 +173,44 @@ neon-strike/
 1. 使用微信开发者工具打开项目目录
 2. 修改 `project.config.json` 中的 `appid`
 3. 点击编译运行
+
+## 图片文字资源
+
+游戏使用图片替换文字显示，需要以下图片文件：
+
+### 已有图片（已实现）
+
+| 图片文件名 | 尺寸 | 对应文字 |
+|-----------|------|---------|
+| icon_title_36px.png | 120x36 | 星空战机 |
+| icon_start_26px.png | 80x26 | 开始游戏 |
+| icon_highscore_16px.png | 48x16 | 最高分 |
+| icon_GAME_OVER_36px.png | 160x36 | GAME OVER |
+| icon_score_36px.png | 48x36 | 得分（结算） |
+| icon_score_16px.png | 32x16 | 得分（HUD） |
+| icon_restart_18px.png | 120x18 | 点击重新开始 |
+| icon_combo_16px.png | 48x16 | 连击 |
+| icon_power_16px.png | 48x16 | 火力 |
+| icon_secondary_16px.png | 64x16 | 副武器 |
+| bomb_btn.png | - | 核弹按钮背景 |
+
+### 待添加图片
+
+| 图片文件名 | 尺寸 | 对应文字 |
+|-----------|------|---------|
+| icon_neonstrike_36px.png | - | NEON STRIKE |
+| icon_heart_16px.png | - | 生命值 |
+| icon_bomb_16px.png | - | 炸弹 |
+| icon_invincible_16px.png | - | 无敌 |
+
+### 道具图标
+
+| 图片文件名 | 对应道具 |
+|-----------|---------|
+| P.png | 火力的P |
+| B.png | 炸弹的B |
+| S.png | 护盾的S |
+| 2x.png | 分数翻倍 |
 
 ## 待扩展方向
 
