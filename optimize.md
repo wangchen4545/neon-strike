@@ -42,3 +42,32 @@
 **问题**: `useNuclearBomb()` 方法被添加到 Player 类（第445-472行），但从 Game 类（第1519行）调用 `this.useNuclearBomb()`，导致 `TypeError: _this7.useNuclearBomb is not a function`
 **修复**: 将 `useNuclearBomb()` 方法从 Player 类移到 Game 类
 **状态**: ✅ 已修复
+
+---
+
+### 6. [2026-04-27] main.js 模块化拆分
+**文件**: `js/main.js` → 7 个文件
+**问题**: 单文件 3362 行，武器/实体/渲染/配置全部混在一起，定位和修改困难
+**拆分方案**:
+
+```
+js/
+├── config.js      90行    CONFIG + WEAPONS（纯数据，零依赖）
+├── utils.js      132行    ObjectPool + SpatialGrid（基础设施，零依赖）
+├── entity.js      45行    Entity 基类（零依赖）
+├── weapons.js    416行    Bullet + Laser + WingmanLaser（依赖 config, entity）
+├── entities.js  1159行    Player + Enemy + Wingman + Item + Particle + Starfield
+├── game.js      1530行    Game 主类（依赖以上全部）
+└── main.js        14行    统一导出入口（兼容 game.js 入口）
+```
+
+**依赖链**（零循环）:
+```
+config → utils → entity → weapons / entities → game → main
+```
+**关键设计**:
+- 实体类不拆散 update() 和 draw()，按类聚合
+- 实体间不直接引用，通过 Game 实例的 spawn* 方法中介
+- game.js 根入口 `import { Game } from "./js/main.js"` 保持不变
+
+**收益**: 单文件最大 1530 行（从 3362 降 54%），武器系统独立可单独修改
