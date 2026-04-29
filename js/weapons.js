@@ -28,7 +28,9 @@ class Bullet extends Entity {
 		this.explodeDistance = 0;
 		this.target = null;
 		this.trail = null;
-	}
+		this.isPierce = false;
+		this.hitEnemies = null;
+		}
 	/**
 	 * 更新子弹位置并检查边界
 	 * @param {number} dt 时间增量（秒）
@@ -52,7 +54,7 @@ class Bullet extends Entity {
 				const newAngle = currentAngle + angleDiff;
 				this.vx = Math.sin(newAngle) * CONFIG.HOMING_MISSILE_SPEED;
 				this.vy = -Math.cos(newAngle) * CONFIG.HOMING_MISSILE_SPEED;
-			}
+		}
 			// 记录尾迹
 			if (!this.trail) this.trail = [];
 			this.trail.push({ x: this.x, y: this.y });
@@ -77,7 +79,7 @@ class Bullet extends Entity {
 					this.explode(game);
 					this.active = false;
 				}
-			}
+		}
 		}
 
 		if (this.y < -50 || this.y > game.canvas.height + 50 || this.x < -50 || this.x > game.canvas.width + 50) {
@@ -124,7 +126,7 @@ class Bullet extends Entity {
 				ctx.fillStyle = `rgba(255, 100, 255, ${alpha})`;
 				ctx.fill();
 				ctx.restore();
-			}
+		}
 		}
 
 		// 导弹主体（向量绘制）
@@ -195,7 +197,7 @@ class Bullet extends Entity {
 			for (let i = 0; i < CONFIG.SCATTER_BOMB_COUNT; i++) {
 				const angle = (i / CONFIG.SCATTER_BOMB_COUNT) * Math.PI * 2;
 				game.spawnSplitBomb(this.x, this.y, angle);
-			}
+		}
 		}
 		// 所有散射炸弹都会造成伤害
 		const enemies = game.enemyPool.getActive();
@@ -206,7 +208,7 @@ class Bullet extends Entity {
 			const dist = Math.sqrt(dx * dx + dy * dy);
 			if (dist < 30) {
 				enemy.takeDamage(this.damage, game);
-			}
+		}
 		}
 	}
 }

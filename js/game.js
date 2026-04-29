@@ -92,8 +92,8 @@ export class Game {
 
 		// 武器切换按钮（底部右侧）
 		this.weaponBtn = {
-			x: this.width - 110,
-			y: this.height - 105,
+			x: 60,
+			y: this.height - 110,
 			width: 55,
 			height: 60,
 		};
@@ -636,7 +636,13 @@ export class Game {
 		bullet.y = y;
 		bullet.vx = vx * CONFIG.PLAYER_BULLET_SPEED;
 		bullet.vy = vy * CONFIG.PLAYER_BULLET_SPEED;
-		bullet.damage = 10;
+		if (this.selectedWeapon === "pierce") {
+				bullet.damage = 8;
+				bullet.isPierce = true;
+				bullet.hitEnemies = [];
+			} else {
+				bullet.damage = 10;
+			}
 		bullet.radius = 4;
 		this.playShootSound();
 	}
@@ -896,10 +902,17 @@ export class Game {
 					const dy = bullet.y - entity.getCenterY();
 					const dist = Math.sqrt(dx * dx + dy * dy);
 					if (dist < bullet.radius + entity.getRadius()) {
-						entity.takeDamage(bullet.damage, this);
-						bullet.active = false;
-						this.bulletPool.release(bullet);
-						break;
+						if (bullet.isPierce) {
+							if (!bullet.hitEnemies.includes(entity)) {
+								entity.takeDamage(bullet.damage, this);
+								bullet.hitEnemies.push(entity);
+							}
+						} else {
+							entity.takeDamage(bullet.damage, this);
+							bullet.active = false;
+							this.bulletPool.release(bullet);
+							break;
+						}
 					}
 				}
 			}

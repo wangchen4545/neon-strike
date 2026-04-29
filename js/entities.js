@@ -71,6 +71,10 @@ class Player extends Entity {
 	shoot(game) {
 		const cx = this.getCenterX();
 		const cy = this.getCenterY();
+		if (game.selectedWeapon === "pierce") {
+			this.shootPierce(game, cx, cy);
+			return;
+		}
 		switch (this.powerLevel) {
 			case 1:
 				game.spawnPlayerBullet(cx - 8, cy - 20, 0, -1);
@@ -99,6 +103,28 @@ class Player extends Entity {
 					game.spawnLaser(cx + 20, cy - 25);
 				}
 				break;
+		}
+	}
+	/**
+	 * 穿透弹射击逻辑
+	 * Lv.1=2发, Lv.2=4发, Lv.3=6发, Lv.4=8发
+	 * @param {Game} game
+	 * @param {number} cx 玩家中心X
+	 * @param {number} cy 玩家中心Y
+	 */
+	shootPierce(game, cx, cy) {
+		let count;
+		switch (this.powerLevel) {
+			case 1: count = 2; break;
+			case 2: count = 4; break;
+			case 3: count = 6; break;
+			default: count = 8; break;
+		}
+		const totalSpread = 50;
+		const spacing = count > 1 ? totalSpread / (count - 1) : 0;
+		for (let i = 0; i < count; i++) {
+			const offset = (i - (count - 1) / 2) * spacing;
+			game.spawnPlayerBullet(cx + offset, cy - 20, 0, -1);
 		}
 	}
 	/**
