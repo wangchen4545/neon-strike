@@ -3,6 +3,7 @@ import { ObjectPool, SpatialGrid } from './utils.js';
 
 import { Bullet, Laser, WingmanLaser } from './weapons.js';
 import { Player, Enemy, Wingman, Item, Particle, Starfield } from './entities.js';
+import { StageManager } from './stage.js';
 
 // ---------------- 游戏主类 ----------------
 /**
@@ -52,7 +53,10 @@ export class Game {
 		this.player = new Player();
 		this.starfield = new Starfield(this.width, this.height);
 
-		// 敌机生成
+		// 关卡管理器
+		this.stageManager = new StageManager();
+
+		// 敌机生成（旧版过渡用，stage系统激活前）
 		this.spawnTimer = 0;
 		this.spawnInterval = CONFIG.SPAWN_INTERVAL_BASE;
 		this.waveCount = 0;
@@ -530,6 +534,8 @@ export class Game {
 		this.laserPool.releaseAll();
 		this.wingmanPool.releaseAll();
 		this.wingmanLaserPool.releaseAll();
+
+		this.stageManager.reset();
 
 		this.spawnTimer = 0;
 		this.spawnInterval = CONFIG.SPAWN_INTERVAL_BASE;
@@ -1025,11 +1031,7 @@ export class Game {
 			}
 		}
 
-		this.spawnTimer += dt * 1000;
-		if (this.spawnTimer >= this.spawnInterval && !this.bossWarning) {
-			this.spawnWave();
-			this.spawnTimer = 0;
-		}
+		this.stageManager.update(dt, this);
 
 		const bullets = this.bulletPool.getActive();
 		for (const bullet of bullets) {
@@ -1439,7 +1441,7 @@ export class Game {
 			// 绘制剩余游戏元素
 			const items = this.itemPool.getActive();
 			for (const item of items) {
-				if (item.active) item.draw(ctx);
+				if (item.active) item.draw(ctx, this);
 			}
 			const enemies = this.enemyPool.getActive();
 			for (const enemy of enemies) {
@@ -1452,7 +1454,7 @@ export class Game {
 		if (this.state === "playing" || this.state === "gameover") {
 			const items = this.itemPool.getActive();
 			for (const item of items) {
-				if (item.active) item.draw(ctx);
+				if (item.active) item.draw(ctx, this);
 			}
 
 			const enemies = this.enemyPool.getActive();
@@ -1493,6 +1495,7 @@ export class Game {
 
 			// 绘制UI
 			this.drawUI(ctx);
+			this.stageManager.drawHUD(ctx, this.width, this.height);
 
 			if (this.screenFlash > 0) {
 				ctx.fillStyle = `rgba(255, 255, 255, ${this.screenFlash * 0.5})`;

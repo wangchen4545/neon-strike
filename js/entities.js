@@ -449,7 +449,7 @@ class Wingman extends Entity {
 	 * 绘制僚机
 	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
 	 */
-	draw(ctx) {
+	draw(ctx, game) {
 		const cx = this.getCenterX();
 		const cy = this.getCenterY();
 
@@ -519,7 +519,7 @@ class Enemy extends Entity {
 			case "scout":
 				this.width = 30;
 				this.height = 30;
-				this.hp = this.maxHp = 1;
+				this.hp = this.maxHp = 50;
 				this.score = 100;
 				this.vx = 0;
 				this.vy = 150;
@@ -528,7 +528,7 @@ class Enemy extends Entity {
 			case "fighter":
 				this.width = 40;
 				this.height = 40;
-				this.hp = this.maxHp = 3;
+				this.hp = this.maxHp = 150;
 				this.score = 300;
 				this.vx = 0;
 				this.vy = 180;
@@ -539,7 +539,7 @@ class Enemy extends Entity {
 			case "elite":
 				this.width = 50;
 				this.height = 50;
-				this.hp = this.maxHp = 15;
+				this.hp = this.maxHp = 750;
 				this.score = 1000;
 				this.vx = 0;
 				this.vy = 100;
@@ -550,7 +550,7 @@ class Enemy extends Entity {
 			case "boss":
 				this.width = 120;
 				this.height = 80;
-				this.hp = this.maxHp = 500;
+				this.hp = this.maxHp = 25000;
 				this.score = 5000;
 				this.vx = 80;
 				this.vy = 30;
@@ -648,7 +648,7 @@ class Enemy extends Entity {
 			}
 		}
 	}
-	draw(ctx) {
+	draw(ctx, game) {
 		const cx = this.getCenterX();
 		const cy = this.getCenterY();
 		ctx.save();
@@ -964,7 +964,7 @@ class Item extends Entity {
 	 * 绘制道具
 	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
 	 */
-	draw(ctx) {
+	draw(ctx, game) {
 		const cx = this.getCenterX();
 		const cy = this.getCenterY();
 		let color, icon;
@@ -998,7 +998,7 @@ class Item extends Entity {
 		ctx.lineWidth = 2;
 		ctx.stroke();
 		ctx.fillStyle = color;
-		ctx.font = `bold 12px ${Game.loadedFont || "Arial"}`;
+		ctx.font = `bold 12px ${game.constructor.loadedFont || "Arial"}`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
 		ctx.fillText(icon, 0, 0);
@@ -1083,7 +1083,7 @@ class Particle extends Entity {
 	 * 绘制粒子效果
 	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
 	 */
-	draw(ctx) {
+	draw(ctx, game) {
 		const alpha = 1 - this.lifeTime / this.maxLifeTime;
 		ctx.beginPath();
 		ctx.arc(this.x, this.y, this.radius * alpha, 0, Math.PI * 2);
@@ -1146,7 +1146,7 @@ class Starfield {
 	 * 绘制星空
 	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
 	 */
-	draw(ctx) {
+	draw(ctx, game) {
 		for (const star of this.stars) {
 			ctx.beginPath();
 			ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
