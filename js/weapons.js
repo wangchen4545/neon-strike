@@ -29,7 +29,12 @@ class Bullet extends Entity {
 		this.target = null;
 		this.trail = null;
 		this.isPierce = false;
+		this.isRefract = false;
+		this.refractCount = 0;
+		this.isLightning = false;
+		this.lightningChains = 0;
 		this.hitEnemies = null;
+		this.color = null;
 		}
 	/**
 	 * 更新子弹位置并检查边界
@@ -93,6 +98,10 @@ class Bullet extends Entity {
 	draw(ctx) {
 		if (this.isMissile || this.isHomingMissile) {
 			this.drawMissile(ctx);
+		} else if (this.isRefract) {
+			this.drawRefractBeam(ctx);
+		} else if (this.isLightning) {
+			this.drawLightningBullet(ctx);
 		} else {
 			this.drawBullet(ctx);
 		}
@@ -160,6 +169,93 @@ class Bullet extends Entity {
 	}
 
 	/**
+	 * 绘制折射弹（亮线光束 + 尾迹）
+	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
+	 */
+	drawRefractBeam(ctx) {
+		const now = Date.now();
+		const tailLen = 120;
+		const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+		if (speed > 0) {
+			const dx = -(this.vx / speed) * tailLen;
+			const dy = -(this.vy / speed) * tailLen;
+			const tx = this.x + dx;
+			const ty = this.y + dy;
+			// 外层光晕
+			const outerGlow = ctx.createLinearGradient(tx, ty, this.x, this.y);
+			outerGlow.addColorStop(0, "rgba(255, 100, 0, 0)");
+			outerGlow.addColorStop(0.3, "rgba(255, 150, 0, 0.15)");
+			outerGlow.addColorStop(0.7, "rgba(255, 180, 0, 0.4)");
+			outerGlow.addColorStop(1, "rgba(255, 220, 0, 0.7)");
+			ctx.beginPath();
+			ctx.moveTo(tx, ty);
+			ctx.lineTo(this.x, this.y);
+			ctx.strokeStyle = outerGlow;
+			ctx.lineWidth = 6;
+			ctx.stroke();
+			// 中层光束
+			const midGlow = ctx.createLinearGradient(tx, ty, this.x, this.y);
+			midGlow.addColorStop(0, "rgba(255, 200, 50, 0)");
+			midGlow.addColorStop(0.4, "rgba(255, 200, 50, 0.5)");
+			midGlow.addColorStop(1, "#FFAA00");
+			ctx.beginPath();
+			ctx.moveTo(tx, ty);
+			ctx.lineTo(this.x, this.y);
+			ctx.strokeStyle = midGlow;
+			ctx.lineWidth = 2.5;
+			ctx.stroke();
+			// 核心白线
+			const flicker = 0.7 + Math.sin(now / 30) * 0.3;
+			ctx.beginPath();
+			ctx.moveTo(tx, ty);
+			ctx.lineTo(this.x, this.y);
+			ctx.strokeStyle = `rgba(255, 255, 255, ${flicker})`;
+			ctx.lineWidth = 1;
+			ctx.stroke();
+		}
+
+	}
+
+	/**
+	 * 绘制雷电弹（白色电弧球）
+	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
+	 */
+	drawLightningBullet(ctx) {
+		const now = Date.now();
+		const flicker = 0.4 + Math.random() * 0.6;
+		// 外电弧光晕
+		for (let i = 0; i < 3; i++) {
+			const angle = (now / 100 + i * Math.PI * 2 / 3) % (Math.PI * 2);
+			const arcLen = 8 + Math.random() * 6;
+			const startX = this.x + Math.cos(angle) * this.radius;
+			const startY = this.y + Math.sin(angle) * this.radius;
+			ctx.beginPath();
+			ctx.moveTo(startX, startY);
+			ctx.lineTo(
+				startX + Math.cos(angle) * arcLen + (Math.random() - 0.5) * 8,
+				startY + Math.sin(angle) * arcLen + (Math.random() - 0.5) * 8
+			);
+			ctx.strokeStyle = `rgba(200, 220, 255, ${flicker * 0.8})`;
+			ctx.lineWidth = 1;
+			ctx.stroke();
+		}
+		// 核心球
+		ctx.beginPath();
+		ctx.arc(this.x, this.y, this.radius + 2, 0, Math.PI * 2);
+		ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + Math.sin(now / 30) * 0.3})`;
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+		ctx.fillStyle = "#FFFFFF";
+		ctx.fill();
+		// 内核
+		ctx.beginPath();
+		ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+		ctx.fillStyle = `rgba(180, 210, 255, ${flicker})`;
+		ctx.fill();
+	}
+
+	/**
 	 * 绘制普通子弹
 	 * @param {CanvasRenderingContext2D} ctx 绘制上下文
 	 */
@@ -174,7 +270,7 @@ class Bullet extends Entity {
 			const pulse = Math.sin(Date.now() / 30) * 0.3 + 0.7;
 			ctx.globalAlpha = pulse;
 		} else {
-			color = this.isPlayerBullet ? CONFIG.COLORS.PLAYER_BULLET : CONFIG.COLORS.ENEMY_BULLET;
+			color = this.color || (this.isPlayerBullet ? CONFIG.COLORS.PLAYER_BULLET : CONFIG.COLORS.ENEMY_BULLET);
 		}
 
 		ctx.beginPath();

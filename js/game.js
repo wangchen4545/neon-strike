@@ -1,9 +1,11 @@
-import { CONFIG, WEAPONS } from './config.js';
-import { ObjectPool, SpatialGrid } from './utils.js';
+/** @format */
 
-import { Bullet, Laser, WingmanLaser } from './weapons.js';
-import { Player, Enemy, Wingman, Item, Particle, Starfield } from './entities.js';
-import { StageManager } from './stage.js';
+import { CONFIG, WEAPONS, FIGHTERS } from "./config.js";
+import { ObjectPool, SpatialGrid } from "./utils.js";
+
+import { Bullet, Laser, WingmanLaser } from "./weapons.js";
+import { Player, Enemy, Wingman, Item, Particle, Starfield } from "./entities.js";
+import { StageManager } from "./stage.js";
 
 // ---------------- 游戏主类 ----------------
 /**
@@ -42,7 +44,7 @@ export class Game {
 
 		// 游戏状态
 		this.state = "menu";
-		this.score = 0;
+		this.score = 1500000;
 		this.highScore = parseInt(wx.getStorageSync("neonStrikeHighScore") || "0");
 		this.combo = 0;
 		this.comboTimer = 0;
@@ -85,15 +87,15 @@ export class Game {
 		// 开始按钮
 		this.startBtn = {
 			x: this.width / 2 - 80,
-			y: this.height / 2 + 40,
+			y: this.height / 2 + 140,
 			width: 160,
 			height: 50,
 		};
 
 		// 武器切换按钮（底部右侧）
 		this.weaponBtn = {
-			x: 60,
-			y: this.height - 110,
+			x: 10,
+			y: this.height - 125,
 			width: 55,
 			height: 60,
 		};
@@ -101,6 +103,23 @@ export class Game {
 		// 武器弹窗状态
 		this.weaponPopupOpen = false;
 		this.selectedWeapon = "standard";
+
+		// 战机选择
+		this.fighterPopupOpen = false;
+		this.selectedFighter = wx.getStorageSync("selectedFighter") || "neon";
+		this.fighterBtn = {
+			x: this.width / 2 - 70,
+			y: this.height / 2 + 90,
+			width: 140,
+			height: 36,
+		};
+		// 游戏内战机切换按钮（左上角，得分下方）
+		this.fighterBtnGame = {
+			x: 10,
+			y: 125,
+			width: 55,
+			height: 55,
+		};
 
 		// 核弹按钮（右下角，距离底部60px）
 		this.nuclearBombBtn = {
@@ -204,22 +223,32 @@ export class Game {
 			console.log("canvas size:", this.canvas.width, this.canvas.height);
 
 			if (this.state === "playing") {
-				// 如果武器弹窗打开，优先处理弹窗触摸
+				// 武器弹窗打开 → 弹窗内触摸
 				if (this.weaponPopupOpen) {
 					const touch = res.touches[0];
 					this.handlePopupTouch(touch.clientX, touch.clientY);
 					return;
 				}
 
-				this.touching = true; // 标记正在触摸
+				// 战机弹窗打开 → 弹窗内触摸
+				if (this.fighterPopupOpen) {
+					const touch = res.touches[0];
+					this.handleFighterPopupTouch(touch.clientX, touch.clientY);
+					return;
+				}
 
-				// 获取触摸点坐标
+				this.touching = true;
+
 				const touch = res.touches[0];
 
-				// 微信小游戏使用 clientX/clientY，不是 x/y
-				console.log("touch.clientX:", touch.clientX, "touch.clientY:", touch.clientY);
+				// 战机按钮（游戏内，左上角）
+				const gfb = this.fighterBtnGame;
+				if (touch.clientX >= gfb.x && touch.clientX <= gfb.x + gfb.width && touch.clientY >= gfb.y && touch.clientY <= gfb.y + gfb.height) {
+					this.fighterPopupOpen = !this.fighterPopupOpen;
+					return;
+				}
 
-				// 武器按钮区域检测（优先）
+				// 武器按钮区域检测
 				const wbtn = this.weaponBtn;
 				if (touch.clientX >= wbtn.x && touch.clientX <= wbtn.x + wbtn.width && touch.clientY >= wbtn.y && touch.clientY <= wbtn.y + wbtn.height) {
 					console.log("打开武器弹窗!");
@@ -260,15 +289,38 @@ export class Game {
 					this.handleTouch({ x: touch.clientX, y: touch.clientY });
 				}
 			} else if (this.state === "menu") {
-				// 菜单状态：点击开始按钮开始游戏
 				const touch = res.touches[0];
+
+				// 如果战机弹窗打开，优先处理
+				if (this.fighterPopupOpen) {
+					this.handleFighterPopupTouch(touch.clientX, touch.clientY);
+					return;
+				}
+
+				// 点击战机按钮 → 打开战机选择
+				const fbtn = this.fighterBtn;
+				console.log("menu touch:", touch.clientX, touch.clientY);
+				console.log("fbtn bounds:", fbtn.x, fbtn.y, fbtn.x + fbtn.width, fbtn.y + fbtn.height);
+				if (touch.clientX >= fbtn.x && touch.clientX <= fbtn.x + fbtn.width && touch.clientY >= fbtn.y && touch.clientY <= fbtn.y + fbtn.height) {
+					console.log("点击更换战机按钮，打开弹窗");
+					this.fighterPopupOpen = true;
+					return;
+				}
+
+				// 点击开始按钮开始游戏
 				const btn = this.startBtn;
 				if (touch.clientX >= btn.x && touch.clientX <= btn.x + btn.width && touch.clientY >= btn.y && touch.clientY <= btn.y + btn.height) {
 					console.log("点击开始按钮，开始游戏");
 					this.startGame();
 				}
 			} else if (this.state === "gameover") {
-				// 游戏结束状态：点击重新开始
+				// 如果战机弹窗打开，优先处理
+				if (this.fighterPopupOpen) {
+					const touch = res.touches[0];
+					this.handleFighterPopupTouch(touch.clientX, touch.clientY);
+					return;
+				}
+				// 点击重新开始
 				console.log("游戏结束状态，重新开始");
 				this.restartGame();
 			}
@@ -398,8 +450,11 @@ export class Game {
 		if (this.popupCards) {
 			for (const card of this.popupCards) {
 				if (touchX >= card.x && touchX <= card.x + card.width && touchY >= card.y && touchY <= card.y + card.height) {
-					this.selectedWeapon = card.id;
-					this.weaponPopupOpen = false;
+					const unlockScore = CONFIG.WEAPON_UNLOCK[card.id] || 0;
+					if (this.score >= unlockScore) {
+						this.selectedWeapon = card.id;
+						this.weaponPopupOpen = false;
+					}
 					return;
 				}
 			}
@@ -407,6 +462,254 @@ export class Game {
 
 		// 点击弹窗外区域 → 关闭弹窗
 		this.weaponPopupOpen = false;
+	}
+
+	/**
+	 * 绘制战机选择弹窗
+	 * @param {CanvasRenderingContext2D} ctx 绘图上下文
+	 */
+	/**
+	 * 绘制战机选择弹窗
+	 * 布局: 2×2 卡片网格，每张卡片包含迷你战机预览 + 名称 + 参考来源
+	 * 顶部面板边框色跟随当前选中战机主题色
+	 * @param {CanvasRenderingContext2D} ctx 绘图上下文
+	 */
+	drawFighterPopup(ctx) {
+		const palette = this.getThemePalette();
+		const w = this.width;
+		const h = this.height;
+
+		// 半透明遮罩
+		ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+		ctx.fillRect(0, 0, w, h);
+
+		// 弹窗面板
+		const panelW = w * 0.88;
+		const panelH = h * 0.7;
+		const panelX = (w - panelW) / 2;
+		const panelY = (h - panelH) / 2;
+
+		const activeFighter = FIGHTERS.find((f) => f.id === this.selectedFighter) || FIGHTERS[0];
+		const theme = activeFighter.primary;
+
+		// 面板背景
+		ctx.fillStyle = "rgba(10, 10, 30, 0.95)";
+		ctx.strokeStyle = theme;
+		ctx.lineWidth = 2;
+		ctx.shadowColor = theme;
+		ctx.shadowBlur = 15;
+		ctx.beginPath();
+		this.roundRect(ctx, panelX, panelY, panelW, panelH, 12);
+		ctx.fill();
+		ctx.stroke();
+		ctx.shadowBlur = 0;
+
+		// 标题
+		this.drawText(ctx, "战机选择", panelX + panelW / 2, panelY + 28, theme, "bold 20px");
+
+		// 关闭按钮
+		const closeX = panelX + panelW - 25;
+		const closeY = panelY + 25;
+		this.fighterPopupCloseBtn = { x: closeX - 14, y: closeY - 14, width: 28, height: 28 };
+		ctx.beginPath();
+		ctx.arc(closeX, closeY, 14, 0, Math.PI * 2);
+		ctx.fillStyle = "rgba(255, 0, 85, 0.2)";
+		ctx.fill();
+		ctx.strokeStyle = palette.accent;
+		ctx.lineWidth = 2;
+		ctx.stroke();
+		ctx.fillStyle = palette.accent;
+		ctx.font = "bold 16px " + (Game.loadedFont || "Arial");
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.fillText("✕", closeX, closeY);
+
+		// 2×2 战机卡片网格
+		const cols = 2;
+		const cardW = (panelW - 45) / cols;
+		const cardH = 110;
+		const gapX = 15;
+		const gapY = 12;
+		const gridStartX = panelX + 15;
+		const gridStartY = panelY + 55;
+
+		// 关卡门槛待 StageManager 就绪后启用
+		// const highestStage = parseInt(wx.getStorageSync("highestStageCleared") || "0");
+
+		this.fighterPopupCards = [];
+
+		for (let i = 0; i < FIGHTERS.length; i++) {
+			const fighter = FIGHTERS[i];
+			const col = i % cols;
+			const row = Math.floor(i / cols);
+			const cardX = gridStartX + col * (cardW + gapX);
+			const cardY = gridStartY + row * (cardH + gapY);
+			const isSelected = this.selectedFighter === fighter.id;
+
+			// 解锁判定：neon 默认解锁，其余暂全解锁（关卡系统就绪后改为 stage 门槛）
+			const unlocked = true; // TODO: fighter.id === "neon" || highestStage >= (fighter.id === "thunder" ? 1 : fighter.id === "ghost" ? 3 : 4);
+			const alpha = unlocked ? 1 : 0.35;
+
+			this.fighterPopupCards.push({ x: cardX, y: cardY, width: cardW, height: cardH, id: fighter.id, unlocked: unlocked });
+
+			// 卡片背景
+			ctx.globalAlpha = alpha;
+			ctx.fillStyle = isSelected ? "rgba(255, 255, 255, 0.1)" : "rgba(255, 255, 255, 0.03)";
+			ctx.strokeStyle = isSelected ? fighter.primary : unlocked ? "rgba(255, 255, 255, 0.3)" : "#444";
+			ctx.lineWidth = isSelected ? 2 : 1;
+			ctx.shadowColor = isSelected ? fighter.primary : "transparent";
+			ctx.shadowBlur = isSelected ? 10 : 0;
+			ctx.beginPath();
+			this.roundRect(ctx, cardX, cardY, cardW, cardH, 10);
+			ctx.fill();
+			ctx.stroke();
+			ctx.shadowBlur = 0;
+			ctx.globalAlpha = 1;
+
+			// 迷你战机预览
+			const miniCX = cardX + cardW / 2;
+			const miniCY = cardY + 38;
+			this.drawMiniFighter(ctx, miniCX, miniCY, 0.9, fighter, alpha);
+
+			// 战机名称
+			ctx.fillStyle = fighter.primary;
+			ctx.globalAlpha = alpha;
+			ctx.font = "bold 16px " + (Game.loadedFont || "Arial");
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText(fighter.name, miniCX, cardY + 72);
+
+			// 参考来源
+			ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+			ctx.font = "11px " + (Game.loadedFont || "Arial");
+			ctx.fillText(fighter.ref, miniCX, cardY + 90);
+
+			// 锁定/已选状态
+			if (!unlocked) {
+				ctx.fillStyle = palette.accent;
+				ctx.font = "bold 12px " + (Game.loadedFont || "Arial");
+				ctx.fillText("🔒", cardX + cardW - 20, cardY + 18);
+			} else if (isSelected) {
+				ctx.fillStyle = fighter.primary;
+				ctx.font = "bold 14px " + (Game.loadedFont || "Arial");
+				ctx.textAlign = "right";
+				ctx.fillText("✓", cardX + cardW - 20, cardY + 18);
+			}
+			ctx.globalAlpha = 1;
+		}
+	}
+
+	/**
+	 * 绘制迷你战机（弹窗卡片 / 首页预览共用）
+	 * 复用 Player.draw() 的向量形状，代入战机独立配色
+	 * @param {CanvasRenderingContext2D} ctx 绘图上下文
+	 * @param {number} cx 中心 X
+	 * @param {number} cy 中心 Y
+	 * @param {number} scale 缩放比例 (0.9 弹窗卡片 / 1.6 首页)
+	 * @param {Object} fighter FIGHTERS 配置项
+	 * @param {number} alpha 透明度 (锁定卡片半透明)
+	 */
+	drawMiniFighter(ctx, cx, cy, scale, fighter, alpha) {
+		ctx.save();
+		ctx.globalAlpha = alpha;
+		ctx.translate(cx, cy);
+		ctx.scale(scale, scale);
+
+		// 主机体
+		ctx.beginPath();
+		ctx.moveTo(0, -28);
+		ctx.lineTo(-25, 5);
+		ctx.lineTo(-20, 12);
+		ctx.lineTo(-8, 8);
+		ctx.lineTo(-5, 18);
+		ctx.lineTo(0, 15);
+		ctx.lineTo(5, 18);
+		ctx.lineTo(8, 8);
+		ctx.lineTo(20, 12);
+		ctx.lineTo(25, 5);
+		ctx.closePath();
+		const bodyGrad = ctx.createLinearGradient(0, -28, 0, 18);
+		bodyGrad.addColorStop(0, fighter.bodyTop);
+		bodyGrad.addColorStop(0.5, fighter.bodyMid);
+		bodyGrad.addColorStop(1, fighter.bodyBot);
+		ctx.fillStyle = bodyGrad;
+		ctx.fill();
+		ctx.strokeStyle = fighter.primary;
+		ctx.lineWidth = 1.5 / scale;
+		ctx.stroke();
+
+		// 驾驶舱
+		ctx.beginPath();
+		ctx.ellipse(0, -8, 5, 10, 0, 0, Math.PI * 2);
+		const cockpitGrad = ctx.createLinearGradient(0, -18, 0, 2);
+		cockpitGrad.addColorStop(0, fighter.cockpit);
+		cockpitGrad.addColorStop(1, fighter.bodyBot);
+		ctx.fillStyle = cockpitGrad;
+		ctx.fill();
+		ctx.strokeStyle = fighter.primary;
+		ctx.lineWidth = 0.8 / scale;
+		ctx.stroke();
+
+		// 引擎火焰
+		const t = Date.now() / 1000;
+		const flameLen = 10 + Math.sin(t * 10 + cx) * 4;
+		ctx.beginPath();
+		ctx.moveTo(-8, 15);
+		ctx.lineTo(-12, 15 + flameLen);
+		ctx.lineTo(-4, 15);
+		ctx.closePath();
+		ctx.fillStyle = fighter.flame[0];
+		ctx.fill();
+		ctx.beginPath();
+		ctx.moveTo(8, 15);
+		ctx.lineTo(4, 15 + flameLen);
+		ctx.lineTo(12, 15);
+		ctx.closePath();
+		ctx.fillStyle = fighter.flame[0];
+		ctx.fill();
+
+		// 机头中线
+		ctx.beginPath();
+		ctx.moveTo(0, -28);
+		ctx.lineTo(0, -5);
+		ctx.strokeStyle = fighter.primary;
+		ctx.lineWidth = 1.2 / scale;
+		ctx.stroke();
+
+		ctx.restore();
+	}
+
+	/**
+	 * 处理战机弹窗触摸事件
+	 * 优先关闭按钮 → 卡片选择（仅解锁可点）→ 点外部关闭
+	 * 选中后写入 wx.setStorageSync 持久化
+	 * @param {number} tx 触摸 X 坐标 (clientX)
+	 * @param {number} ty 触摸 Y 坐标 (clientY)
+	 */
+	handleFighterPopupTouch(tx, ty) {
+		// 关闭按钮
+		const closeBtn = this.fighterPopupCloseBtn;
+		if (closeBtn && tx >= closeBtn.x && tx <= closeBtn.x + closeBtn.width && ty >= closeBtn.y && ty <= closeBtn.y + closeBtn.height) {
+			this.fighterPopupOpen = false;
+			return;
+		}
+
+		// 战机卡片
+		if (this.fighterPopupCards) {
+			for (const card of this.fighterPopupCards) {
+				if (tx >= card.x && tx <= card.x + card.width && ty >= card.y && ty <= card.y + card.height) {
+					if (card.unlocked) {
+						this.selectedFighter = card.id;
+						wx.setStorageSync("selectedFighter", card.id);
+						this.fighterPopupOpen = false;
+					}
+					return;
+				}
+			}
+		}
+
+		// 点击外部 → 关闭
+		this.fighterPopupOpen = false;
 	}
 
 	/**
@@ -440,59 +743,74 @@ export class Game {
 	}
 
 	drawStartScreen() {
+		const palette = this.getThemePalette();
 		const ctx = this.ctx;
+		const activeFighter = FIGHTERS.find((f) => f.id === this.selectedFighter) || FIGHTERS[0];
+		const theme = activeFighter.primary;
+		const accent = activeFighter.accent;
+
 		ctx.fillStyle = "#050510";
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		this.starfield.draw(ctx);
 
-		// 标题
-		this.drawText(ctx, "NEON STRIKE", this.canvas.width / 2, this.canvas.height / 2 - 80, "#00F2FF", "bold 30px");
+		// 标题 — 跟随主题色
+		this.drawText(ctx, "NEON STRIKE", this.canvas.width / 2, this.canvas.height / 2 - 130, theme, "bold 30px");
+		this.drawText(ctx, "星渊战机", this.canvas.width / 2, this.canvas.height / 2 - 92, accent, "24px");
 
-		this.drawText(ctx, "星渊战机", this.canvas.width / 2, this.canvas.height / 2 - 40, "#FF0055", "30px");
+		// 当前战机迷你预览
+		const previewCY = this.canvas.height / 2 - 10;
+		this.drawMiniFighter(ctx, this.canvas.width / 2, previewCY, 1.6, activeFighter, 1);
+		this.drawText(ctx, activeFighter.name, this.canvas.width / 2, previewCY + 52, theme, "bold 18px");
 
-		// 绘制开始按钮
-		const btn = this.startBtn;
+		// 战机切换按钮
+		const fbtn = this.fighterBtn;
 		const pulse = Math.sin(Date.now() / 300) * 0.1 + 0.9;
+		ctx.strokeStyle = `rgba(255, 255, 255, ${pulse * 0.5})`;
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		this.roundRect(ctx, fbtn.x, fbtn.y, fbtn.width, fbtn.height, 18);
+		ctx.stroke();
+		ctx.fillStyle = `rgba(255, 255, 255, ${pulse * 0.08})`;
+		ctx.fill();
+		this.drawText(ctx, "更换战机 ›", this.width / 2, fbtn.y + fbtn.height / 2, "rgba(255,255,255,0.7)", "14px");
 
-		// 按钮发光效果
+		// 开始按钮
+		const btn = this.startBtn;
 		ctx.save();
-		ctx.shadowColor = "#00F2FF";
+		ctx.shadowColor = theme;
 		ctx.shadowBlur = 5;
-		ctx.shadowOffsetX = 0;
-		ctx.shadowOffsetY = 0;
-
-		// 按钮背景
-		ctx.fillStyle = `rgba(0, 242, 255, ${pulse * 0.2})`;
+		const tr = parseInt(theme.slice(1, 3), 16);
+		const tg = parseInt(theme.slice(3, 5), 16);
+		const tb = parseInt(theme.slice(5, 7), 16);
+		ctx.fillStyle = `rgba(${tr}, ${tg}, ${tb}, ${pulse * 0.2})`;
 		ctx.fillRect(btn.x, btn.y, btn.width, btn.height);
-
-		// 按钮边框
-		ctx.strokeStyle = `rgba(0, 242, 255, ${pulse})`;
+		ctx.strokeStyle = `rgba(${tr}, ${tg}, ${tb}, ${pulse})`;
 		ctx.lineWidth = 2;
 		ctx.strokeRect(btn.x, btn.y, btn.width, btn.height);
-
 		ctx.restore();
 
-		// 按钮文字
-		this.drawText(ctx, "开始游戏", this.width / 2, btn.y + btn.height / 2, "#00F2FF", "bold 22px");
+		// 开始按钮文字
+		this.drawText(ctx, "开始游戏", this.width / 2, btn.y + btn.height / 2, theme, "bold 22px");
 
 		// 最高分
 		if (this.highScore > 0) {
-			this.drawText(ctx, `最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 120, "#FF9900", "16px");
+			this.drawText(ctx, `最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 2000, palette.accentDim, "16px");
 		}
 	}
 
 	drawGameOverScreen() {
+		const palette = this.getThemePalette();
 		const ctx = this.ctx;
 		ctx.fillStyle = "rgba(5, 5, 16, 0.9)";
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-		this.drawText(ctx, "GAME OVER", this.canvas.width / 2, this.canvas.height / 2 - 60, "#FF0055", "bold 36px");
+		this.drawText(ctx, "GAME OVER", this.canvas.width / 2, this.canvas.height / 2 - 60, palette.accent, "bold 36px");
 
-		this.drawText(ctx, `得分: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2, "#00F2FF", "24px");
+		this.drawText(ctx, `得分: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2, palette.primary, "24px");
 
-		this.drawText(ctx, `最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 40, "#FF9900", "18px");
+		this.drawText(ctx, `最高分: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 40, palette.accentDim, "18px");
 
-		this.drawText(ctx, "点击重新开始", this.canvas.width / 2, this.canvas.height / 2 + 90, "#00F2FF", "16px");
+		this.drawText(ctx, "点击重新开始", this.canvas.width / 2, this.canvas.height / 2 + 90, palette.primaryDim, "16px");
 	}
 
 	/**
@@ -517,7 +835,7 @@ export class Game {
 	 * 重置游戏状态与对象，准备新一局。
 	 */
 	resetGame() {
-		this.score = 0;
+		this.score = 1500000;
 		this.combo = 0;
 		this.comboTimer = 0;
 		this.scoreMultiplier = 1;
@@ -637,13 +955,25 @@ export class Game {
 		bullet.vx = vx * CONFIG.PLAYER_BULLET_SPEED;
 		bullet.vy = vy * CONFIG.PLAYER_BULLET_SPEED;
 		if (this.selectedWeapon === "pierce") {
-				bullet.damage = 8;
-				bullet.isPierce = true;
-				bullet.hitEnemies = [];
-			} else {
-				bullet.damage = 10;
-			}
+			bullet.damage = 8;
+			bullet.isPierce = true;
+			bullet.hitEnemies = [];
+		} else if (this.selectedWeapon === "lightning") {
+			bullet.damage = 12;
+			bullet.isLightning = true;
+			bullet.lightningChains = 0;
+			bullet.hitEnemies = [];
+		} else if (this.selectedWeapon === "refract") {
+			bullet.damage = 10;
+			bullet.isRefract = true;
+			bullet.refractCount = 0;
+			bullet.hitEnemies = [];
+		} else {
+			bullet.damage = 10;
+		}
 		bullet.radius = 4;
+		const fighter = FIGHTERS.find((f) => f.id === this.selectedFighter) || FIGHTERS[0];
+		bullet.color = fighter.bullet;
 		this.playShootSound();
 	}
 
@@ -744,12 +1074,12 @@ export class Game {
 		laser.init(x, y);
 	}
 
-	findNearestEnemy(playerX, playerY) {
+	findNearestEnemy(playerX, playerY, excludeEnemies = null) {
 		const enemies = this.enemyPool.getActive();
 		let nearest = null;
 		let minDist = Infinity;
 		for (const enemy of enemies) {
-			if (enemy.active) {
+			if (enemy.active && !(excludeEnemies && excludeEnemies.includes(enemy))) {
 				const dx = enemy.getCenterX() - playerX;
 				const dy = enemy.getCenterY() - playerY;
 				const dist = Math.sqrt(dx * dx + dy * dy);
@@ -839,7 +1169,54 @@ export class Game {
 	 * @param {string} color 文字颜色
 	 * @param {string} fontSize 字体大小，如 "20px"
 	 */
-	drawText(ctx, text, x, y, color = "#00F2FF", fontSize = "20px") {
+	/**
+	 * 将 hex 颜色与白色混合，返回更亮的 hex
+	 * @param {string} hex 颜色值
+	 * @param {number} factor 混合比例 0~1
+	 * @returns {string}
+	 */
+	lightenColor(hex, factor = 0.5) {
+		const r = parseInt(hex.slice(1, 3), 16);
+		const g = parseInt(hex.slice(3, 5), 16);
+		const b = parseInt(hex.slice(5, 7), 16);
+		const dr = Math.round(r + (255 - r) * factor);
+		const dg = Math.round(g + (255 - g) * factor);
+		const db = Math.round(b + (255 - b) * factor);
+		return "#" + [dr, dg, db].map(v => v.toString(16).padStart(2, "0")).join("");
+	}
+
+	/**
+	 * 将 hex 颜色与黑色混合，返回更暗的 hex
+	 * @param {string} hex 颜色值
+	 * @param {number} factor 混合比例 0~1
+	 * @returns {string}
+	 */
+	darkenColor(hex, factor = 0.5) {
+		const r = parseInt(hex.slice(1, 3), 16);
+		const g = parseInt(hex.slice(3, 5), 16);
+		const b = parseInt(hex.slice(5, 7), 16);
+		const dr = Math.round(r * (1 - factor));
+		const dg = Math.round(g * (1 - factor));
+		const db = Math.round(b * (1 - factor));
+		return "#" + [dr, dg, db].map(v => v.toString(16).padStart(2, "0")).join("");
+	}
+
+	/**
+	 * 获取当前主题调色板
+	 * @returns {{ primary: string, accent: string, primaryDim: string, accentDim: string, accentLight: string }}
+	 */
+	getThemePalette() {
+		const fighter = FIGHTERS.find(f => f.id === this.selectedFighter) || FIGHTERS[0];
+		return {
+			primary: fighter.primary,
+			accent: fighter.accent,
+			primaryDim: this.darkenColor(fighter.primary, 0.35),
+			accentDim: this.darkenColor(fighter.accent, 0.35),
+			accentLight: this.lightenColor(fighter.accent, 0.4),
+		};
+	}
+
+	drawText(ctx, text, x, y, color = palette.primary, fontSize = "20px") {
 		const fontFamily = Game.loadedFont || "Arial";
 		ctx.font = `${fontSize} ${fontFamily}`;
 		ctx.fillStyle = color;
@@ -906,6 +1283,62 @@ export class Game {
 							if (!bullet.hitEnemies.includes(entity)) {
 								entity.takeDamage(bullet.damage, this);
 								bullet.hitEnemies.push(entity);
+							}
+						} else if (bullet.isRefract) {
+							if (!bullet.hitEnemies.includes(entity)) {
+								entity.takeDamage(bullet.damage, this);
+								bullet.hitEnemies.push(entity);
+								if (bullet.refractCount < 3) {
+									const nextTarget = this.findNearestEnemy(bullet.x, bullet.y, bullet.hitEnemies);
+									if (nextTarget) {
+										const tdx = nextTarget.getCenterX() - bullet.x;
+										const tdy = nextTarget.getCenterY() - bullet.y;
+										const tdist = Math.sqrt(tdx * tdx + tdy * tdy);
+										const speed = CONFIG.PLAYER_BULLET_SPEED;
+										bullet.vx = (tdx / tdist) * speed;
+										bullet.vy = (tdy / tdist) * speed;
+										bullet.refractCount++;
+										this.screenFlash = 0.1;
+										this.spawnSparkles(bullet.x, bullet.y, 8);
+										this.playThunderSound();
+									} else {
+										bullet.active = false;
+										this.bulletPool.release(bullet);
+										break;
+									}
+								} else {
+									bullet.active = false;
+									this.bulletPool.release(bullet);
+									break;
+								}
+							}
+						} else if (bullet.isLightning) {
+							if (!bullet.hitEnemies.includes(entity)) {
+								entity.takeDamage(bullet.damage, this);
+								bullet.hitEnemies.push(entity);
+								this.screenFlash = 0.2;
+								this.spawnSparkles(bullet.x, bullet.y, 6);
+								this.playThunderSound();
+								if (bullet.lightningChains < 4) {
+									const nextTarget = this.findNearestEnemy(bullet.x, bullet.y, bullet.hitEnemies);
+									if (nextTarget) {
+										const tdx = nextTarget.getCenterX() - bullet.x;
+										const tdy = nextTarget.getCenterY() - bullet.y;
+										const tdist = Math.sqrt(tdx * tdx + tdy * tdy);
+										const speed = CONFIG.PLAYER_BULLET_SPEED * 1.5;
+										bullet.vx = (tdx / tdist) * speed;
+										bullet.vy = (tdy / tdist) * speed;
+										bullet.lightningChains++;
+									} else {
+										bullet.active = false;
+										this.bulletPool.release(bullet);
+										break;
+									}
+								} else {
+									bullet.active = false;
+									this.bulletPool.release(bullet);
+									break;
+								}
 							}
 						} else {
 							entity.takeDamage(bullet.damage, this);
@@ -1133,6 +1566,7 @@ export class Game {
 	 * @param {CanvasRenderingContext2D} ctx 绘图上下文
 	 */
 	drawWeaponPopup(ctx) {
+		const palette = this.getThemePalette();
 		const w = this.width;
 		const h = this.height;
 
@@ -1148,9 +1582,9 @@ export class Game {
 
 		// 面板背景
 		ctx.fillStyle = "rgba(10, 10, 30, 0.95)";
-		ctx.strokeStyle = "#00F2FF";
+		ctx.strokeStyle = palette.primary;
 		ctx.lineWidth = 2;
-		ctx.shadowColor = "#00F2FF";
+		ctx.shadowColor = palette.primary;
 		ctx.shadowBlur = 15;
 		ctx.beginPath();
 		this.roundRect(ctx, panelX, panelY, panelW, panelH, 12);
@@ -1159,7 +1593,7 @@ export class Game {
 		ctx.shadowBlur = 0;
 
 		// 标题
-		this.drawText(ctx, "武器选择", panelX + panelW / 2, panelY + 28, "#00F2FF", "bold 20px");
+		this.drawText(ctx, "武器选择", panelX + panelW / 2, panelY + 28, palette.primary, "bold 20px");
 
 		// 关闭按钮（右上角，距右边15px，距顶部15px）
 		const closeX = panelX + panelW - 25;
@@ -1169,10 +1603,10 @@ export class Game {
 		ctx.arc(closeX, closeY, 14, 0, Math.PI * 2);
 		ctx.fillStyle = "rgba(255, 0, 85, 0.2)";
 		ctx.fill();
-		ctx.strokeStyle = "#FF0055";
+		ctx.strokeStyle = palette.accent;
 		ctx.lineWidth = 2;
 		ctx.stroke();
-		ctx.fillStyle = "#FF0055";
+		ctx.fillStyle = palette.accent;
 		ctx.font = `bold 16px ${Game.loadedFont || "Arial"}`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
@@ -1194,10 +1628,16 @@ export class Game {
 			// 存储卡片区域供触摸检测
 			this.popupCards.push({ x: cardX, y: cardY, width: cardW, height: cardH, id: weapon.id });
 
+			// 检查解锁状态
+			const unlockScore = CONFIG.WEAPON_UNLOCK[weapon.id] || 0;
+			const unlocked = this.score >= unlockScore;
+			const cardColor = unlocked ? weapon.color : "#555555";
+			const cardAlpha = unlocked ? 1 : 0.4;
+
 			// 卡片背景
-			ctx.fillStyle = isSelected ? "rgba(0, 242, 255, 0.15)" : "rgba(255, 255, 255, 0.05)";
-			ctx.strokeStyle = isSelected ? weapon.color : "rgba(255, 255, 255, 0.2)";
-			ctx.lineWidth = isSelected ? 2 : 1;
+			ctx.fillStyle = isSelected && unlocked ? "rgba(0, 242, 255, 0.15)" : "rgba(255, 255, 255, 0.05)";
+			ctx.strokeStyle = isSelected && unlocked ? weapon.color : unlocked ? "rgba(255, 255, 255, 0.3)" : "rgba(85, 85, 85, 0.4)";
+			ctx.lineWidth = isSelected && unlocked ? 2 : 1;
 			ctx.beginPath();
 			this.roundRect(ctx, cardX, cardY, cardW, cardH, 8);
 			ctx.fill();
@@ -1208,40 +1648,80 @@ export class Game {
 			const iconCY = cardY + cardH / 2;
 			ctx.beginPath();
 			ctx.arc(iconCX, iconCY, 10, 0, Math.PI * 2);
-			ctx.fillStyle = weapon.color;
-			ctx.globalAlpha = 0.3;
+			ctx.fillStyle = cardColor;
+			ctx.globalAlpha = unlocked ? 0.3 : 0.1;
 			ctx.fill();
 			ctx.globalAlpha = 1;
-			ctx.strokeStyle = weapon.color;
+			ctx.strokeStyle = cardColor;
 			ctx.lineWidth = 2;
 			ctx.stroke();
 			// 图标内符号
-			const iconSymbol = weapon.id === "standard" ? "◆" : weapon.id === "pierce" ? "➤" : weapon.id === "ricochet" ? "↗" : weapon.id === "orbital" ? "◎" : "?";
-			ctx.fillStyle = weapon.color;
+			const iconSymbol = unlocked ? (weapon.id === "standard" ? "◆" : weapon.id === "pierce" ? "➤" : weapon.id === "lightning" ? "⚡" : weapon.id === "refract" ? "↗" : "?") : "🔒";
+			ctx.fillStyle = cardColor;
 			ctx.font = `12px ${Game.loadedFont || "Arial"}`;
 			ctx.textAlign = "center";
 			ctx.textBaseline = "middle";
+			ctx.globalAlpha = cardAlpha;
 			ctx.fillText(iconSymbol, iconCX, iconCY);
+			ctx.globalAlpha = 1;
 
 			// 武器名称
-			ctx.fillStyle = weapon.color;
+			ctx.fillStyle = cardColor;
 			ctx.font = `bold 16px ${Game.loadedFont || "Arial"}`;
 			ctx.textAlign = "left";
+			ctx.globalAlpha = cardAlpha;
 			ctx.fillText(weapon.name, iconCX + 20, cardY + 16);
+			ctx.globalAlpha = 1;
 
-			// 描述
-			ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+			// 描述 或 解锁提示
+			ctx.fillStyle = unlocked ? "rgba(255, 255, 255, 0.6)" : "#666666";
 			ctx.font = `11px ${Game.loadedFont || "Arial"}`;
-			ctx.fillText(weapon.desc, iconCX + 20, cardY + 32);
+			const descText = unlocked ? weapon.desc : "需分数 " + unlockScore.toLocaleString() + " 解锁";
+			ctx.fillText(descText, iconCX + 20, cardY + 32);
 
 			// 选中标记
-			if (isSelected) {
+			if (isSelected && unlocked) {
 				ctx.fillStyle = weapon.color;
 				ctx.font = `bold 14px ${Game.loadedFont || "Arial"}`;
 				ctx.textAlign = "right";
 				ctx.fillText("✓", cardX + cardW - 15, iconCY);
 			}
 		}
+	}
+
+	/**
+	/**
+	 * 绘制游戏内战战机切换按钮（左上角圆形图标）
+	 * @param {CanvasRenderingContext2D} ctx 绘图上下文
+	 */
+	drawFighterBtnGame(ctx) {
+		const activeFighter = FIGHTERS.find((f) => f.id === this.selectedFighter) || FIGHTERS[0];
+		const btn = this.fighterBtnGame;
+		const cx = btn.x + btn.width / 2;
+		const cy = btn.y + btn.height / 2;
+		const pulse = Math.sin(Date.now() / 200) * 0.15 + 0.85;
+
+		ctx.save();
+		// 圆形背景
+		ctx.beginPath();
+		ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+		ctx.fillStyle = "rgba(5, 5, 16, 0.85)";
+		ctx.fill();
+		ctx.strokeStyle = activeFighter.primary;
+		ctx.lineWidth = 2;
+		ctx.shadowColor = activeFighter.primary;
+		ctx.shadowBlur = 8 * pulse;
+		ctx.stroke();
+		ctx.shadowBlur = 0;
+
+		// 迷你战机
+		this.drawMiniFighter(ctx, cx, cy, 0.7, activeFighter, 1);
+
+		// 战机和类型文字
+		this.drawText(ctx, activeFighter.name, cx, cy + 28, activeFighter.primary, "10px");
+		this.drawText(ctx, activeFighter.desc, cx, cy + 42, "rgba(255,255,255,0.5)", "9px");
+
+		ctx.restore();
 	}
 
 	/**
@@ -1311,16 +1791,20 @@ export class Game {
 	 * @param {CanvasRenderingContext2D} ctx 绘图上下文
 	 */
 	drawUI(ctx) {
+		const palette = this.getThemePalette();
 		// 得分（左对齐）
-		this.drawText(ctx, `得分: ${this.score}`, 60, 60, "#00F2FF", "16px");
+		this.drawText(ctx, `得分: ${this.score}`, 60, 60, palette.primary, "16px");
 
 		// 连击（左对齐，第二行）
 		if (this.combo > 1) {
-			this.drawText(ctx, `连击 x${this.combo}`, 60, 85, "#FF9900", "16px");
+			this.drawText(ctx, `连击 x${this.combo}`, 60, 85, palette.accent, "16px");
 		}
 
+		// 战机切换按钮（左上角圆形按钮）
+		this.drawFighterBtnGame(ctx);
+
 		// 生命值（往右下方移动30px）
-		ctx.fillStyle = "#FF0055";
+		ctx.fillStyle = palette.accent;
 		ctx.textAlign = "right";
 		ctx.font = `30px ${Game.loadedFont || "Arial"}`;
 		let lives = "";
@@ -1328,10 +1812,10 @@ export class Game {
 		ctx.fillText(lives, this.canvas.width - 20, 90);
 
 		// 火力
-		this.drawText(ctx, `火力 Lv.${this.player.powerLevel}`, 60, this.canvas.height - 60, "#00FF9D", "16px");
+		this.drawText(ctx, `火力 Lv.${this.player.powerLevel}`, 60, this.canvas.height - 60, palette.primaryDim, "16px");
 
 		// 副武器（沿 Y 轴与火力对齐）
-		this.drawText(ctx, `副武器 Lv.${this.player.secondaryWeaponLevel}`, 150, this.canvas.height - 60, "#FF00FF", "16px");
+		this.drawText(ctx, `副武器 Lv.${this.player.secondaryWeaponLevel}`, 150, this.canvas.height - 60, palette.accentDim, "16px");
 
 		// 武器切换按钮
 		this.drawWeaponButton(ctx);
@@ -1339,7 +1823,7 @@ export class Game {
 		// 无敌状态显示
 		if (this.scoreInvincible) {
 			const timeLeft = Math.ceil(this.scoreInvincibleTimer / 1000);
-			this.drawText(ctx, `无敌 ${timeLeft}s`, this.canvas.width / 2, 60, "#FFD700", "16px");
+			this.drawText(ctx, `无敌 ${timeLeft}s`, this.canvas.width / 2, 60, palette.accentLight, "16px");
 		}
 
 		// 核弹按钮（分数达到100000时显示）
@@ -1447,6 +1931,9 @@ export class Game {
 
 		if (this.state === "menu") {
 			this.drawStartScreen();
+			if (this.fighterPopupOpen) {
+				this.drawFighterPopup(ctx);
+			}
 			return;
 		}
 
@@ -1461,6 +1948,9 @@ export class Game {
 				if (enemy.active) enemy.draw(ctx);
 			}
 			this.drawGameOverScreen();
+			if (this.fighterPopupOpen) {
+				this.drawFighterPopup(ctx);
+			}
 			return;
 		}
 
@@ -1526,6 +2016,11 @@ export class Game {
 			// 武器选择弹窗（最顶层）
 			if (this.weaponPopupOpen) {
 				this.drawWeaponPopup(ctx);
+			}
+
+			// 战机选择弹窗（最顶层）
+			if (this.fighterPopupOpen) {
+				this.drawFighterPopup(ctx);
 			}
 		}
 	}

@@ -13,44 +13,38 @@ neon-strike/
 ├── images/                  # 图片资源
 ├── audio/                   # 音频资源
 └── js/
-    ├── main.js              # 全部游戏逻辑（~1800行）
+    ├── main.js              # 统一导出入口（14行）
+    ├── config.js            # 配置常量 CONFIG + WEAPONS（90行）
+    ├── utils.js             # 工具类 ObjectPool + SpatialGrid（132行）
+    ├── entity.js            # Entity 基类（45行）
+    ├── weapons.js           # 武器类 Bullet + Laser + WingmanLaser（416行）
+    ├── entities.js          # 实体类 Player + Enemy + Wingman + Item + Particle + Starfield（1159行）
+    ├── game.js              # Game 主类（~1530行）
     ├── render.js            # 渲染模块（桩文件）
     ├── databus.js           # 数据总线（桩文件）
-    ├── libs/
-    │   └── tinyemitter.js   # 事件发射器（未使用）
-    ├── base/
-    │   ├── sprite.js        # 精灵基类（桩文件）
-    │   ├── animation.js     # 动画类（桩文件）
-    │   └── pool.js          # 对象池（桩文件）
-    ├── player/
-    │   ├── index.js         # 玩家类（桩文件）
-    │   └── bullet.js        # 子弹类（桩文件）
-    ├── npc/
-    │   └── enemy.js         # 敌人类（桩文件）
-    └── runtime/
-        ├── background.js    # 背景类（桩文件）
-        ├── gameinfo.js      # 游戏信息（桩文件）
-        └── music.js         # 音乐类（桩文件）
-```
+    └── (桩文件目录)          # base/, player/, npc/, runtime/, libs/
 
-> **注意**：所有游戏逻辑集中在 `js/main.js`，其他 JS 文件均为桩文件，尚未实现。
+> **2026-04-27 重构**：原单文件 `main.js`（3362行）拆分为 7 个模块，零循环依赖。
 
 ## 游戏系统
 
-### 核心类（js/main.js）
+### 核心类（拆分后各文件）
 
-| 类名 | 行号 | 功能 |
+| 类名 | 文件 | 功能 |
 |------|------|------|
-| ObjectPool | 46-96 | 对象池，复用子弹/敌人/道具/粒子对象，减少 GC |
-| SpatialGrid | 102-171 | 空间网格，碰撞检测优化 O(n²) → O(n) |
-| Entity | 177-215 | 实体基类，位置/速度/碰撞半径 |
-| Player | 221-383 | 玩家飞机，HP/火力等级/无敌帧/护盾 |
-| Bullet | 389-429 | 子弹（玩家/敌人共用） |
-| Laser | 435-563 | 激光武器，含闪电链效果 |
-| Enemy | 569-825 | 敌机（4种类型 + Boss三阶段） |
-| Item | 831-952 | 道具掉落（火力/炸弹/护盾/分数） |
-| Particle | 958-1010 | 粒子特效（爆炸/火花/擦弹） |
-| Starfield | 1016-1072 | 星空滚动背景 |
+| ObjectPool | utils.js | 对象池，复用子弹/敌人/道具/粒子对象，减少 GC |
+| SpatialGrid | utils.js | 空间网格，碰撞检测优化 O(n²) → O(n) |
+| Entity | entity.js | 实体基类，位置/速度/碰撞半径 |
+| Player | entities.js | 玩家飞机，HP/火力等级/无敌帧/护盾 |
+| Bullet | weapons.js | 子弹（玩家/敌人共用），含穿透/雷电/折射 |
+| Laser | weapons.js | 激光武器，含闪电链效果 |
+| WingmanLaser | weapons.js | 僚机激光 |
+| Enemy | entities.js | 敌机（4种类型 + Boss三阶段） |
+| Wingman | entities.js | 僚机跟随+射击 |
+| Item | entities.js | 道具掉落（火力/炸弹/护盾/分数） |
+| Particle | entities.js | 粒子特效（爆炸/火花/擦弹） |
+| Starfield | entities.js | 星空滚动背景 |
+| Game | game.js | 游戏主类（循环/碰撞/UI/刷敌/状态） |
 
 ### 游戏状态
 
@@ -71,7 +65,7 @@ neon-strike/
 
 ### 武器系统
 
-游戏共 **4 大类武器** + 1 个可选武器空壳（UI 已实现，射击逻辑待开发）。
+游戏共 **4 大类武器** + 可选武器系统。
 
 #### 一、主武器（Primary）
 
@@ -123,14 +117,16 @@ neon-strike/
 | id | 名称 | 描述 | DPS（Lv.3 单目标） | 实现状态 |
 |----|------|------|-------------------|----------|
 | standard | 标准弹 | 2~10 发扇形 / Lv.4 追踪激光 | 1000 | ✅ 已实现 |
-| pierce | 穿透弹 | 直射穿透，伤害8，Lv.1=2发/Lv.2=4发/Lv.3=6发/Lv.4=8发 | 480（×敌人数） | ✅ 已实现 |
-| ricochet | 弹射弹 | 碰壁反弹 2 次，伤害递增 | — | ❌ 空壳 |
-| orbital | 护身弹 | 4 颗能量球环绕旋转 | — | ❌ 空壳 |
+| pierce | 穿透弹 | 直射穿透，伤害8 | 480（×敌人数） | ✅ 已实现 |
+| lightning | 雷电弹 | 命中连锁4个敌机，电弧跳跃，伤害12 | — | ✅ 已实现 |
+| refract | 折射弹 | 光束子弹，命中折射3次带雷电特效，伤害10 | — | ✅ 已实现 |
 
-**穿透弹特性：**
-- 每发子弹可同时命中多个敌人，命中 2 个等效 960 DPS，3 个反超标准弹
-- 子弹不因命中销毁，追踪已命中敌机避免重复伤害
-- 配合 Boss 阶段大量刷敌设计效果最佳
+**武器解锁**: standard(0) / pierce(30,000) / lightning(80,000) / refract(150,000)，未解锁灰色不可选
+
+**武器特性：**
+- **穿透弹**: 每发子弹可同时命中多个敌人，子弹不因命中销毁
+- **雷电弹**: 命中后自动连锁最近未命中敌机，最多 4 跳，1.5x 速度
+- **折射弹**: 亮线光束绘制，命中折射 3 次，每次附带屏幕闪光+雷电音效
 
 ### 敌机系统
 
@@ -205,7 +201,7 @@ neon-strike/
 
 ### 关卡系统
 
-采用 **5 个主题关卡 + 无限模式** 的结构，通过 StageManager 管理关卡流程。**已接入 game.js。**
+采用 **5 个主题关卡 + 无限模式** 的结构，通过 StageManager 管理关卡流程。（StageManager 尚未实现）
 
 #### 关卡统一时间线（每关 30s 小兵 → Boss）
 
@@ -364,6 +360,6 @@ neon-strike/
 ## 待扩展方向
 
 - `images/` 和 `audio/` 目录可添加更多资源
-- 可选武器系统（穿透弹/弹射弹/护身弹）的射击逻辑待实现
+- 可选武器系统（穿透弹/雷电弹/折射弹）射击逻辑已实现，可继续扩展更多武器
 - 音效系统（music.js）尚未实现
 - 可考虑添加：成就系统、排行榜

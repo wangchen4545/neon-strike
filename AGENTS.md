@@ -12,13 +12,14 @@
 ## 文件结构
 ```
 js/
-├── main.js          # 入口，初始化 Game 并启动循环
+├── main.js          # 统一导出入口（barrel export）
 ├── game.js          # 游戏主类（~1500行）— 状态/循环/UI/碰撞/刷敌/炸弹
 ├── entities.js      # 实体类 — Player, Enemy, Wingman, Item, Particle, Starfield
 ├── weapons.js       # 武器类 — Bullet, Laser, WingmanLaser
-├── stage.js         # 关卡系统 — StageManager, STAGE_DATA
-├── config.js        # 配置常量 — CONFIG, WEAPONS
-└── utils.js         # 工具类 — ObjectPool, SpatialGrid
+├── entity.js        # Entity 基类
+├── config.js        # 配置常量 — CONFIG, WEAPONS, WEAPON_UNLOCK
+├── utils.js         # 工具类 — ObjectPool, SpatialGrid
+└── (桩文件)          # databus.js, render.js, base/, player/, npc/, runtime/
 ```
 
 ## 武器系统
@@ -28,14 +29,14 @@ js/
 |------|------|------|------|------|------|
 | standard | 2发直射 | 5发扇形 | 10发扇形 | 追踪激光×2 | 10/发, 激光 2/tick |
 | pierce | 2发直射 | 4发直射 | 6发直射 | 8发直射 | 8/发, 穿透不销毁 |
-| ricochet | — | — | — | — | 空壳 |
-| orbital | — | — | — | — | 空壳 |
+| lightning | 2发直射 | 3发直射 | 4发直射 | 5发直射 | 12/发, 命中连锁4跳, 1.5x速度 |
+| refract | 2发直射 | 3发直射 | 4发直射 | 5发直射 | 10/发, 光束, 命中折射3次 |
 
-### 穿透弹实现细节
-- **spawnPlayerBullet** (game.js:639): 检查 `this.selectedWeapon === "pierce"`，设置 `isPierce=true`, `hitEnemies=[]`, `damage=8`
-- **碰撞检测** (game.js:905): 穿透弹命中后检查 `hitEnemies.includes(entity)`，未命中才伤害，命中后 push 进数组，子弹不销毁
-- **shootPierce** (entities.js:115): 根据 `powerLevel` 发射 2/4/6/8 枚直射弹
-- **Bullet 类** (weapons.js:31): `this.isPierce`, `this.hitEnemies`
+### 可选武器实现细节
+- **spawnPlayerBullet** (game.js): 根据 `selectedWeapon` 设置不同属性（isPierce / isLightning / isRefract）
+- **碰撞检测** (game.js): 穿透弹无重复命中、雷电弹连锁4跳、折射弹折射3次+闪光
+- **武器解锁**: `CONFIG.WEAPON_UNLOCK` 阈值控制，弹窗灰色锁定+🔒
+- **Bullet 类** (weapons.js): `isPierce`, `isLightning`, `lightningChains`, `isRefract`, `refractCount`, `hitEnemies`
 
 ### 副武器 (2s CD), 僚机 (分数解锁), 炸弹
 - 副武器 Lv.1 普通导弹(50), Lv.2 散射高爆弹, Lv.3 追踪导弹(50)
@@ -61,3 +62,4 @@ js/
 - Boss 阶段不刷敌（`return; // Boss战期间不刷敌`），待改为大量刷敌
 - `app.json`, `game.json` 文件内容为空
 - 双 Boss 第二个用 setTimeout 异步，可能有时序问题
+- `game.js` 中 `import { StageManager } from './stage.js'` 引用了不存在的文件，StageManager 未实现

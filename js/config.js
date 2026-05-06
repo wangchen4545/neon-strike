@@ -33,7 +33,7 @@ const CONFIG = {
 		GRAZE: "#FFFFFF",
 	},
 	// 副武器配置
-	SECONDARY_ENABLED: true,
+	SECONDARY_ENABLED: false,
 	SECONDARY_COOLDOWN: 2000,
 	SECONDARY_WEAPON_THRESHOLDS: [100000, 500000],
 	// 炸弹清屏配置
@@ -53,6 +53,13 @@ const CONFIG = {
 	WINGMAN_LASER_WIDTH: 3,
 	WINGMAN_LASER_INTERVALS: [333, 143, 100], // 3次/秒, 7次/秒, 10次/秒
 	WINGMAN_LASER_DURATION: 600,
+	// 武器解锁分数
+	WEAPON_UNLOCK: {
+		standard: 0,
+		pierce: 30000,
+		lightning: 80000,
+		refract: 150000,
+	},
 };
 
 // ---------------- 可选武器定义 ----------------
@@ -72,19 +79,89 @@ const WEAPONS = [
 		icon: "pierce",
 	},
 	{
-		id: "ricochet",
-		name: "弹射弹",
-		desc: "碰壁反弹2次，伤害递增",
-		color: "#FF9900",
-		icon: "ricochet",
+		id: "lightning",
+		name: "雷电弹",
+		desc: "命中后连锁4个敌人，电弧跳跃",
+		color: "#FFFFFF",
+		icon: "lightning",
 	},
 	{
-		id: "orbital",
-		name: "护身弹",
-		desc: "4颗能量球环绕旋转",
-		color: "#FF00FF",
-		icon: "orbital",
+		id: "refract",
+		name: "折射弹",
+		desc: "光束子弹，命中折射3次带雷电特效",
+		color: "#FF9900",
+		icon: "refract",
 	},
 ];
 
-export { CONFIG, WEAPONS };
+// ---------------- 战机定义 ----------------
+// primary: 主题色(UI边框/标题/选中标记)
+// accent:  辅色(副标题/火焰)
+// bullet:  子弹色
+// bodyTop/Mid/Bot: 机体渐变(头→尾)
+// cockpit: 驾驶舱色
+// flame:   [左引擎, 右引擎]
+const FIGHTERS = [
+	{
+		id: "neon",
+		name: "星渊号",
+		ref: "EVA初号机",
+		desc: "均衡型",
+		unlock: "初始拥有",
+		primary: "#7B2FFF",
+		accent: "#00FF44",
+		bullet: "#C8FF00",
+		bodyTop: "#6A1FD4",
+		bodyMid: "#8B3FFF",
+		bodyBot: "#4A0FA0",
+		cockpit: "#00FF44",
+		flame: ["#7B2FFF", "#00FF44"],
+	},
+	{
+		id: "thunder",
+		name: "雷神",
+		ref: "高达",
+		desc: "突击型",
+		unlock: "通关 Stage 1",
+		primary: "#FFFFFF",
+		accent: "#0088FF",
+		bullet: "#00CCFF",
+		bodyTop: "#CCE0FF",
+		bodyMid: "#FFFFFF",
+		bodyBot: "#0066CC",
+		cockpit: "#0088FF",
+		flame: ["#0088FF", "#FFFFFF"],
+	},
+	{
+		id: "ghost",
+		name: "幽灵",
+		ref: "黑紫",
+		desc: "隐形型",
+		unlock: "通关 Stage 3",
+		primary: "#AA00FF",
+		accent: "#1A0033",
+		bullet: "#DD88FF",
+		bodyTop: "#1A0033",
+		bodyMid: "#7700CC",
+		bodyBot: "#0D001A",
+		cockpit: "#DD88FF",
+		flame: ["#AA00FF", "#FFFFFF"],
+	},
+	{
+		id: "blaze",
+		name: "烈焰",
+		ref: "钢铁侠",
+		desc: "重装型",
+		unlock: "通关 Stage 4",
+		primary: "#CC0000",
+		accent: "#FFAA00",
+		bullet: "#FF4400",
+		bodyTop: "#CC0000",
+		bodyMid: "#FF4400",
+		bodyBot: "#880000",
+		cockpit: "#FFAA00",
+		flame: ["#CC0000", "#FFAA00"],
+	},
+];
+
+export { CONFIG, WEAPONS, FIGHTERS };

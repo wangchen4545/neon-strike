@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js';
+import { CONFIG, FIGHTERS } from './config.js';
 import { Entity } from './entity.js';
 
 // ---------------- 玩家 ----------------
@@ -75,6 +75,14 @@ class Player extends Entity {
 			this.shootPierce(game, cx, cy);
 			return;
 		}
+		if (game.selectedWeapon === "refract") {
+			this.shootRefract(game, cx, cy);
+			return;
+		}
+		if (game.selectedWeapon === "lightning") {
+			this.shootLightning(game, cx, cy);
+			return;
+		}
 		switch (this.powerLevel) {
 			case 1:
 				game.spawnPlayerBullet(cx - 8, cy - 20, 0, -1);
@@ -128,6 +136,90 @@ class Player extends Entity {
 		}
 	}
 	/**
+	 * 折射弹射击逻辑（细长激光束）
+	 * Lv.1=2发, Lv.2=3发, Lv.3=4发, Lv.4=5发
+	 * @param {Game} game
+	 * @param {number} cx 玩家中心X
+	 * @param {number} cy 玩家中心Y
+	 */
+	shootRefract(game, cx, cy) {
+		let count;
+		switch (this.powerLevel) {
+			case 1: count = 2; break;
+			case 2: count = 3; break;
+			case 3: count = 4; break;
+			default: count = 5; break;
+		}
+		const spacing = 12;
+		for (let i = 0; i < count; i++) {
+			const offset = (i - (count - 1) / 2) * spacing;
+			game.spawnPlayerBullet(cx + offset, cy - 20, 0, -1);
+		}
+	}
+	/**
+	 * 雷电弹射击逻辑（电弧球直线发射）
+	 * Lv.1=2发, Lv.2=3发, Lv.3=4发, Lv.4=5发
+	 * @param {Game} game
+	 * @param {number} cx 玩家中心X
+	 * @param {number} cy 玩家中心Y
+	 */
+	shootLightning(game, cx, cy) {
+		let count;
+		switch (this.powerLevel) {
+			case 1: count = 2; break;
+			case 2: count = 3; break;
+			case 3: count = 4; break;
+			default: count = 5; break;
+		}
+		const spacing = 10;
+		for (let i = 0; i < count; i++) {
+			const offset = (i - (count - 1) / 2) * spacing;
+			game.spawnPlayerBullet(cx + offset, cy - 20, 0, -1);
+		}
+	}
+	/**
+	 * 折射弹射击逻辑（细长激光束）
+	 * Lv.1=2发, Lv.2=3发, Lv.3=4发, Lv.4=5发
+	 * @param {Game} game
+	 * @param {number} cx 玩家中心X
+	 * @param {number} cy 玩家中心Y
+	 */
+	shootRefract(game, cx, cy) {
+		let count;
+		switch (this.powerLevel) {
+			case 1: count = 2; break;
+			case 2: count = 3; break;
+			case 3: count = 4; break;
+			default: count = 5; break;
+		}
+		const spacing = 12;
+		for (let i = 0; i < count; i++) {
+			const offset = (i - (count - 1) / 2) * spacing;
+			game.spawnPlayerBullet(cx + offset, cy - 20, 0, -1);
+		}
+	}
+	/**
+	 * 雷电弹射击逻辑（电弧球直线发射）
+	 * Lv.1=2发, Lv.2=3发, Lv.3=4发, Lv.4=5发
+	 * @param {Game} game
+	 * @param {number} cx 玩家中心X
+	 * @param {number} cy 玩家中心Y
+	 */
+	shootLightning(game, cx, cy) {
+		let count;
+		switch (this.powerLevel) {
+			case 1: count = 2; break;
+			case 2: count = 3; break;
+			case 3: count = 4; break;
+			default: count = 5; break;
+		}
+		const spacing = 10;
+		for (let i = 0; i < count; i++) {
+			const offset = (i - (count - 1) / 2) * spacing;
+			game.spawnPlayerBullet(cx + offset, cy - 20, 0, -1);
+		}
+	}
+	/**
 	 * 根据副武器等级发射副武器
 	 * @param {Game} game 游戏主对象
 	 */
@@ -161,10 +253,17 @@ class Player extends Entity {
 		const cx = this.getCenterX();
 		const cy = this.getCenterY();
 		const now = Date.now();
+		const f = FIGHTERS.find(f => f.id === game.selectedFighter) || FIGHTERS[0];
+		const hexToRgba = (hex, alpha) => {
+			const r = parseInt(hex.slice(1, 3), 16);
+			const g = parseInt(hex.slice(3, 5), 16);
+			const b = parseInt(hex.slice(5, 7), 16);
+			return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+		};
 		if (this.shield) {
 			ctx.beginPath();
 			ctx.arc(cx, cy, 30, 0, Math.PI * 2);
-			ctx.strokeStyle = CONFIG.COLORS.ITEM_SHIELD;
+			ctx.strokeStyle = f.accent;
 			ctx.lineWidth = 2;
 			ctx.globalAlpha = 0.5 + Math.sin(now / 200) * 0.3;
 			ctx.stroke();
@@ -185,7 +284,7 @@ class Player extends Entity {
 			ctx.lineTo(-12, 15 + flameLength);
 			ctx.lineTo(-4, 15);
 			ctx.closePath();
-			ctx.fillStyle = `rgba(255, 100, 0, ${flamePulse})`;
+			ctx.fillStyle = hexToRgba(f.flame[0], flamePulse);
 			ctx.fill();
 			// 右引擎火焰
 			ctx.beginPath();
@@ -193,7 +292,7 @@ class Player extends Entity {
 			ctx.lineTo(4, 15 + flameLength);
 			ctx.lineTo(12, 15);
 			ctx.closePath();
-			ctx.fillStyle = `rgba(255, 100, 0, ${flamePulse})`;
+			ctx.fillStyle = hexToRgba(f.flame[0], flamePulse);
 			ctx.fill();
 			// 中引擎火焰
 			ctx.beginPath();
@@ -201,7 +300,7 @@ class Player extends Entity {
 			ctx.lineTo(0, 25 + flameLength * 0.8);
 			ctx.lineTo(3, 18);
 			ctx.closePath();
-			ctx.fillStyle = `rgba(255, 200, 50, ${flamePulse})`;
+			ctx.fillStyle = hexToRgba(f.flame[1], flamePulse);
 			ctx.fill();
 
 			// 主体机翼背景
@@ -218,12 +317,12 @@ class Player extends Entity {
 			ctx.lineTo(25, 5); // 右翼尖
 			ctx.closePath();
 			const bodyGradient = ctx.createLinearGradient(0, -28, 0, 18);
-			bodyGradient.addColorStop(0, "#0088FF");
-			bodyGradient.addColorStop(0.5, "#00CCFF");
-			bodyGradient.addColorStop(1, "#0055AA");
+			bodyGradient.addColorStop(0, f.bodyTop);
+			bodyGradient.addColorStop(0.5, f.bodyMid);
+			bodyGradient.addColorStop(1, f.bodyBot);
 			ctx.fillStyle = bodyGradient;
 			ctx.fill();
-			ctx.strokeStyle = "#00FFFF";
+			ctx.strokeStyle = f.primary;
 			ctx.lineWidth = 1.5;
 			ctx.stroke();
 
@@ -234,7 +333,7 @@ class Player extends Entity {
 			ctx.lineTo(-18, 8);
 			ctx.lineTo(-10, 2);
 			ctx.closePath();
-			ctx.fillStyle = "#0066CC";
+			ctx.fillStyle = hexToRgba(f.bodyBot, 0.8);
 			ctx.fill();
 			// 右翼细节
 			ctx.beginPath();
@@ -243,19 +342,19 @@ class Player extends Entity {
 			ctx.lineTo(18, 8);
 			ctx.lineTo(10, 2);
 			ctx.closePath();
-			ctx.fillStyle = "#0066CC";
+			ctx.fillStyle = hexToRgba(f.bodyBot, 0.8);
 			ctx.fill();
 
-			// 驾驶舱（椭圆形）
+			// 驾驶舱
 			ctx.beginPath();
 			ctx.ellipse(0, -8, 5, 10, 0, 0, Math.PI * 2);
 			const cockpitGradient = ctx.createLinearGradient(0, -18, 0, 2);
-			cockpitGradient.addColorStop(0, "#00FFFF");
-			cockpitGradient.addColorStop(0.5, "#0088AA");
-			cockpitGradient.addColorStop(1, "#004466");
+			cockpitGradient.addColorStop(0, f.cockpit);
+			cockpitGradient.addColorStop(0.5, f.bodyMid);
+			cockpitGradient.addColorStop(1, f.bodyBot);
 			ctx.fillStyle = cockpitGradient;
 			ctx.fill();
-			ctx.strokeStyle = "#00FFFF";
+			ctx.strokeStyle = f.primary;
 			ctx.lineWidth = 1;
 			ctx.stroke();
 
@@ -269,7 +368,7 @@ class Player extends Entity {
 			ctx.beginPath();
 			ctx.moveTo(0, -28);
 			ctx.lineTo(0, -5);
-			ctx.strokeStyle = "#00FFFF";
+			ctx.strokeStyle = f.primary;
 			ctx.lineWidth = 2;
 			ctx.stroke();
 
@@ -277,22 +376,22 @@ class Player extends Entity {
 			ctx.beginPath();
 			ctx.moveTo(0, -5);
 			ctx.lineTo(0, 15);
-			ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
+			ctx.strokeStyle = hexToRgba(f.primary, 0.3);
 			ctx.lineWidth = 1;
 			ctx.stroke();
 
 			// 引擎口
 			ctx.beginPath();
 			ctx.ellipse(-8, 16, 4, 3, 0, 0, Math.PI * 2);
-			ctx.fillStyle = "#FF6600";
+			ctx.fillStyle = f.flame[0];
 			ctx.fill();
 			ctx.beginPath();
 			ctx.ellipse(8, 16, 4, 3, 0, 0, Math.PI * 2);
-			ctx.fillStyle = "#FF6600";
+			ctx.fillStyle = f.flame[0];
 			ctx.fill();
 			ctx.beginPath();
 			ctx.ellipse(0, 18, 3, 2, 0, 0, Math.PI * 2);
-			ctx.fillStyle = "#FFAA00";
+			ctx.fillStyle = f.flame[1];
 			ctx.fill();
 
 			ctx.restore();
